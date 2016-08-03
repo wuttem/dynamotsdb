@@ -1,2 +1,2 @@
-# dynamotsdb
-Dynamo as a time series store
+# pytsdb
+Time Series Store in Python
