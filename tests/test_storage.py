@@ -6,7 +6,8 @@ import logging
 import random
 
 
-from pytsdb.storage import MemoryStorage, Item
+from pytsdb.storage import MemoryStorage
+from pytsdb.models import Item
 
 
 class StorageTest(unittest.TestCase):
@@ -23,6 +24,21 @@ class StorageTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pass
+
+    def test_split(self):
+        d = []
+        for i in range(100):
+            d.append((i, i * 2))
+        i = Item("ph")
+        i.insert(d)
+        self.assertEqual(len(i), 100)
+        buckets = i.split_item(30)
+        self.assertEqual(len(buckets), 4)
+        self.assertEqual(len(buckets[0]), 30)
+        self.assertEqual(len(buckets[1]), 30)
+        self.assertEqual(len(buckets[2]), 30)
+        self.assertEqual(len(buckets[3]), 10)
+        self.assertEqual(len(i), 30)
 
     def test_rawitem(self):
         d = []
@@ -108,7 +124,7 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(ds[1].data, {"foo": "bar2"})
         self.assertEqual(ds[2].data, {"foo": "bar3"})
 
-        ds = l._query(key="test.ph", range_min=1100, range_max=1200)
+        ds = l._query(key="test.ph", range_min=1101, range_max=1200)
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds[0].data, {"foo": "bar2"})
         self.assertEqual(ds[1].data, {"foo": "bar3"})
