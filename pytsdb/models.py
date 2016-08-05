@@ -11,8 +11,11 @@ import array
 
 class Item(object):
     HEADER_SIZE = 4
+    ITEMTYPES = ["dynamic", "hourly", "daily", "weekly"]
+    DYNAMICSIZE_TARGET = 100
+    DYNAMICSIZE_MAX = 190
 
-    def __init__(self, key, values=None, version=1):
+    def __init__(self, key, values=None, version=1, item_type="dynamic"):
         self._timestamps = array.array(b"I")
         self._values = array.array(b"f")
         if values is not None:
@@ -58,7 +61,7 @@ class Item(object):
         return True
 
     def __ne__(self, other):
-        return not self == other  # NOT `return not self.__eq__(other)`
+        return not self == other  # NOT return not self.__eq__(other)
 
     def __repr__(self):
         l = len(self._timestamps)
@@ -80,6 +83,13 @@ class Item(object):
         if len(self._timestamps) > 0:
             return self._timestamps[0]
         return -1
+
+    def split_needed(self, limit="soft"):
+        if len(self) > Item.DYNAMICSIZE_MAX:
+            return True
+        if len(self) > Item.DYNAMICSIZE_TARGET and limit == "soft":
+            return True
+        return False
 
     def _at(self, i):
         return (self._timestamps[i], self._values[i])
@@ -160,3 +170,22 @@ class Item(object):
     def insert(self, series):
         for timestamp, value in series:
             self.insert_point(timestamp, value)
+
+
+class ResultSet(Item):
+    def __init__(self, key, items):
+        super(ResultSet, self).__init__(key)
+        for i in items:
+            if i.key != key:
+                raise ValueError("Item has wrong key")
+            self._timestamps += i._timestamps
+            self._values += i._values
+
+    def _trim(self, ts_min, ts_max):
+        low = bisect.bisect_left(self._timestamps, ts_min)
+        high = bisect.bisect_right(self._timestamps, ts_max)
+        self._timestamps = self._timestamps[low:high]
+        self._values = self._values[low:high]
+
+    def all(self):
+        return itertools.izip(self._timestamps, self._values)

@@ -83,3 +83,8 @@ class StorageTest(unittest.TestCase):
         buckets = d.storage.query("ph", 0, 50000)
         self.assertGreater(len(buckets), 450)
         self.assertLess(len(buckets), 550)
+
+        res = d._query("ph", 1, 50000)
+        self.assertEqual(len(res), 49999)
+        res = d._query("ph", 0, 49999)
+        self.assertEqual(len(res), 50000)

@@ -5,7 +5,7 @@ import re
 import logging
 
 from .storage import MemoryStorage
-from .models import Item
+from .models import Item, ResultSet
 from .errors import NotFoundError
 
 
@@ -27,6 +27,8 @@ class TSDB(object):
             "BUCKETSIZE_MAX": BUCKETSIZE_MAX
         }
         self.settings.update(kwargs)
+        Item.DYNAMICSIZE_TARGET = self.settings["BUCKETSIZE_TARGET"]
+        Item.DYNAMICSIZE_MAX = self.settings["BUCKETSIZE_MAX"]
 
     def _get_last_item_or_new(self, key):
         try:
@@ -38,8 +40,10 @@ class TSDB(object):
     def _get_items_between(self, key, ts_min, ts_max):
         return self.storage.query(key, ts_min, ts_max)
 
-    def _get(self):
-        pass
+    def _query(self, key, ts_min, ts_max):
+        r = ResultSet(key, self._get_items_between(key, ts_min, ts_max))
+        r._trim(ts_min, ts_max)
+        return r
 
     def _insert_or_update_item(self, item):
         if item.existing:
@@ -99,11 +103,11 @@ class TSDB(object):
         updated_splitted = []
         for i in updated:
             # Check Size for Split
-            if len(i) <= self.settings["BUCKETSIZE_TARGET"]:
+            if not i.split_needed(limit="soft"):
                 logger.debug("No Split, No Fragmentation")
                 updated_splitted.append(i)
             # If its not the last we let it grow a bit
-            elif i != last_item and len(i) <= self.settings["BUCKETSIZE_MAX"]:
+            elif i != last_item and not i.split_needed(limit="hard"):
                 logger.debug("Fragmentation, No Split")
                 updated_splitted.append(i)
             else:
@@ -118,5 +122,5 @@ class TSDB(object):
             self._insert_or_update_item(i)
             stats["updated"] += 1
 
-        logger.info("Insert Finished {}".format(stats))
+        logger.debug("Insert Finished {}".format(stats))
         return stats
