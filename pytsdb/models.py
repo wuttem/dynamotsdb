@@ -2,6 +2,11 @@
 # coding: utf8
 from __future__ import print_function
 
+try:
+    from itertools import izip as zip
+except ImportError:  # will be 3.x series
+    pass
+
 from enum import Enum
 from collections import MutableSequence
 from collections import namedtuple
@@ -295,4 +300,4 @@ class ResultSet(Item):
         self._values = self._values[low:high]
 
     def all(self):
-        return itertools.izip(self._timestamps, self._values)
+        return zip(self._timestamps, self._values)
