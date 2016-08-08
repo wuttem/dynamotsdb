@@ -34,7 +34,7 @@ class ItemType(Enum):
 
 
 class TupleArray(MutableSequence):
-    def __init__(self, data_type=b"f", tuple_size=2):
+    def __init__(self, data_type="f", tuple_size=2):
         if tuple_size < 2 or tuple_size > 20:
             raise ValueError("invalid tuple size (2-20)")
         super(TupleArray, self).__init__()
@@ -98,19 +98,19 @@ class Item(object):
 
     def __init__(self, key, values=None, item_type=ItemType.raw_float,
                  bucket_type=BucketType.dynamic):
-        self._timestamps = array.array(b"I")
+        self._timestamps = array.array("I")
         if item_type == ItemType.raw_float:
-            self._values = array.array(b"f")
+            self._values = array.array("f")
         elif item_type == ItemType.raw_int:
-            self._values = array.array(b"I")
+            self._values = array.array("I")
         elif item_type == ItemType.tuple_float_2:
-            self._values = TupleArray(b"f", 2)
+            self._values = TupleArray("f", 2)
         elif item_type == ItemType.tuple_float_3:
-            self._values = TupleArray(b"f", 3)
+            self._values = TupleArray("f", 3)
         elif item_type == ItemType.tuple_float_4:
-            self._values = TupleArray(b"f", 4)
+            self._values = TupleArray("f", 4)
         elif item_type == ItemType.basic_aggregation:
-            self._values = TupleArray(b"f", 4)
+            self._values = TupleArray("f", 4)
         else:
             raise NotImplementedError("invalid item type")
         if values is not None:
