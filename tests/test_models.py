@@ -143,4 +143,4 @@ class ModelTest(unittest.TestCase):
         i = Item("ph", d)
         s = i.to_string()
         self.assertEqual(binascii.hexlify(s),
-                         '0100010001000000ffff00000000c040')
+                         b'0100010001000000ffff00000000c040')
