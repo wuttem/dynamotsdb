@@ -2,3 +2,4 @@ enum34>=1.1.2
 boto>=2.38.0
 pytest>=2.8.5
 pytest-cov>=2.2.1
+python-coveralls>=2.7.0

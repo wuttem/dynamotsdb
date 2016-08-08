@@ -7,4 +7,7 @@ python:
 install:
   - pip install -r requirements.txt
   - pip install .
-script: py.test
+script:
+  - py.test --doctest-modules --pep8 pytzdb -v --cov pytzdb --cov-report term-missing
+after_success:
+  - coveralls
