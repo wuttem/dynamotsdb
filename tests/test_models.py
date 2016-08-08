@@ -4,7 +4,7 @@
 import unittest
 import random
 import logging
-
+import binascii
 
 from pytsdb.models import Item, ItemType, Aggregation, TupleArray
 
@@ -142,4 +142,5 @@ class ModelTest(unittest.TestCase):
         d = [(2**16 - 1, 6.0)]
         i = Item("ph", d)
         s = i.to_string()
-        self.assertEqual(s.encode("hex"), '0100010001000000ffff00000000c040')
+        self.assertEqual(binascii.hexlify(s),
+                         '0100010001000000ffff00000000c040')
