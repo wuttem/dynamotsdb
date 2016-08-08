@@ -87,8 +87,8 @@ class TupleArray(MutableSequence):
     def fromstring(self, string):
         s = len(string) / len(self._arrays)
         for i, a in enumerate(self._arrays):
-            f = i * s
-            t = i * s + s
+            f = int(i * s)
+            t = int(i * s + s)
             a.fromstring(string[f:t])
 
 
@@ -133,7 +133,7 @@ class Item(object):
 
     def is_sorted(self):
         it = iter(self._timestamps)
-        it.next()
+        it.__next__()
         return all(b >= a for a, b in itertools.izip(self._timestamps, it))
 
     def __bool__(self):
@@ -214,7 +214,7 @@ class Item(object):
     def split_item(self, count):
         if count >= len(self._timestamps):
             raise ValueError("split to big")
-        splits = range(count, len(self._timestamps), count)
+        splits = list(range(count, len(self._timestamps), count))
         splits += [len(self._timestamps)]
 
         new_items = []
