@@ -139,7 +139,7 @@ class Item(object):
     def is_sorted(self):
         it = iter(self._timestamps)
         it.__next__()
-        return all(b >= a for a, b in itertools.izip(self._timestamps, it))
+        return all(b >= a for a, b in zip(self._timestamps, it))
 
     def __bool__(self):
         if len(self._timestamps) != len(self._values):
