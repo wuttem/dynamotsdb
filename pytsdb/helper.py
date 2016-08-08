@@ -11,7 +11,8 @@ def to_ts(dt):
     if isinstance(dt, datetime.datetime):
         return int((dt - datetime.datetime(1970, 1, 1)).total_seconds())
     if isinstance(dt, datetime.date):
-        return int((dt - datetime.datetime(1970, 1, 1)).total_seconds())
+        d = datetime.datetime.combine(dt, datetime.datetime.min.time())
+        return int((d - datetime.datetime(1970, 1, 1)).total_seconds())
     return int(dt)
 
 

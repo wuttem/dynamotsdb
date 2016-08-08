@@ -25,6 +25,25 @@ class StorageTest(unittest.TestCase):
         logging.basicConfig(level=logging.INFO)
         pass
 
+    def test_invalidmetricname(self):
+        with self.assertRaises(ValueError):
+            d = TSDB()
+            d._insert("hüü", [(1, 1.1)])
+
+    def test_merge(self):
+        d = TSDB(BUCKETSIZE_TARGET=2, BUCKETSIZE_MAX=2)
+        d._insert("merge", [(1, 1.1), (2, 2.2), (5, 5.5), (6, 6.6),
+                            (9, 9.9), (0, 0.0)])
+        res = d._query("merge", 0, 10)
+        self.assertEqual(len(res), 6)
+        d._insert("merge", [(3, 3.3), (4, 4.4), (7, 7.7), (8, 8.8)])
+        res = d._query("merge", 0, 10)
+        self.assertEqual(len(res), 10)
+        buckets = d.storage.query("merge", 0, 10)
+        self.assertEqual(len(buckets), 5)
+        for b in buckets:
+            self.assertEqual(len(b), 2)
+
     def test_basic(self):
         d = TSDB(BUCKETSIZE_TARGET=3, BUCKETSIZE_MAX=3)
         d._insert("hi", [(1, 1.1), (2, 2.2)])
