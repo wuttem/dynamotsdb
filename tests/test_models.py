@@ -25,6 +25,28 @@ class ModelTest(unittest.TestCase):
         logging.basicConfig(level=logging.INFO)
         pass
 
+    def test_item(self):
+        i1 = Item("test", item_type=ItemType.tuple_float_3)
+        self.assertFalse(i1)
+        self.assertFalse(i1._dirty)
+        self.assertFalse(i1.existing)
+        i1.insert_point(1, (1.0, 2.0, 3.0))
+        self.assertTrue(i1)
+        self.assertTrue(i1._dirty)
+
+        i2 = Item("test1", [(1, 1.0)])
+        self.assertEqual(i2[0], (1, 1.0))
+        i2.insert_point(1, 2.0)
+        self.assertEqual(i2[0], (1, 1.0))
+        i2.insert_point(1, 2.0, overwrite=True)
+        self.assertEqual(i2[0], (1, 2.0))
+
+        i3 = Item("test2", [(1, 1.0)])
+        self.assertNotEqual(i2, i3)
+
+        i4 = Item("test1", [(1, 1.0)])
+        self.assertEqual(i2, i4)
+
     def test_tuplearray(self):
         t = TupleArray("f", 2)
         self.assertEqual(len(t), 0)

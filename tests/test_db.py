@@ -32,17 +32,20 @@ class StorageTest(unittest.TestCase):
 
     def test_merge(self):
         d = TSDB(BUCKETSIZE_TARGET=2, BUCKETSIZE_MAX=2)
-        d._insert("merge", [(1, 1.1), (2, 2.2), (5, 5.5), (6, 6.6),
-                            (9, 9.9), (0, 0.0)])
+        d._insert("merge", [(1, 2.0), (2, 3.0), (5, 6.0), (6, 7.0),
+                            (9, 10.0), (0, 1.0)])
         res = d._query("merge", 0, 10)
         self.assertEqual(len(res), 6)
-        d._insert("merge", [(3, 3.3), (4, 4.4), (7, 7.7), (8, 8.8)])
-        res = d._query("merge", 0, 10)
-        self.assertEqual(len(res), 10)
+        d._insert("merge", [(3, 4.0), (4, 5.0), (7, 8.0), (8, 9.0)])
         buckets = d.storage.query("merge", 0, 10)
         self.assertEqual(len(buckets), 5)
         for b in buckets:
             self.assertEqual(len(b), 2)
+
+        res = d._query("merge", 0, 10)
+        self.assertEqual(len(res), 10)
+        for ts, v in res.all():
+            self.assertAlmostEqual(float(ts + 1.0), v)
 
     def test_basic(self):
         d = TSDB(BUCKETSIZE_TARGET=3, BUCKETSIZE_MAX=3)
