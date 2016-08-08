@@ -1,10 +1,11 @@
 #!/usr/bin/python
 # coding: utf8
+from __future__ import print_function
 
-from __future__ import unicode_literals
 from enum import Enum
 from collections import MutableSequence
 from collections import namedtuple
+
 import bisect
 import logging
 import itertools
