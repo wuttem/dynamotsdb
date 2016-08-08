@@ -136,17 +136,25 @@ class Item(object):
     def __len__(self):
         return len(self._timestamps)
 
-    def is_sorted(self):
+    def __bool__(self):  # Python 3
+        if len(self) < 1:
+            return False
+        if len(self._timestamps) != len(self._values):
+            return False
+        # Check if sorted
         it = iter(self._timestamps)
         it.__next__()
         return all(b >= a for a, b in zip(self._timestamps, it))
 
-    def __bool__(self):
+    def __nonzero__(self):  # PYthon 2
+        if len(self) < 1:
+            return False
         if len(self._timestamps) != len(self._values):
             return False
-        if not self.is_sorted():
-            return False
-        return True
+        # Check if sorted
+        it = iter(self._timestamps)
+        it.next()
+        return all(b >= a for a, b in zip(self._timestamps, it))
 
     def __eq__(self, other):
         if self.key != other.key:
