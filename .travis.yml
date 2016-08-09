@@ -11,3 +11,5 @@ script:
   - coverage run --source pytsdb -m py.test
 after_success:
   - coveralls
+services:
+  - redis-server

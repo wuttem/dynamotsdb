@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import re
 import logging
 
-from .storage import MemoryStorage
+from .storage import MemoryStorage, RedisStorage
 from .models import Item, ResultSet
 from .errors import NotFoundError
 
@@ -13,9 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class TSDB(object):
-    def __init__(self, memory_storage=True, **kwargs):
-        if memory_storage:
+    def __init__(self, storage="memory", **kwargs):
+        if storage == "memory":
             self.storage = MemoryStorage()
+        elif storage == "redis":
+            self.storage = RedisStorage()
         else:
             raise NotImplementedError("Storage not implemented")
         self.settings = {

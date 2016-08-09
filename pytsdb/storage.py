@@ -3,6 +3,7 @@
 
 from __future__ import unicode_literals
 import bisect
+from redis import StrictRedis as Redis
 from collections import namedtuple
 from .errors import NotFoundError, ConflictError
 from .models import Item
@@ -11,9 +12,101 @@ from .models import Item
 Element = namedtuple('Element', ['key', 'range_key', 'data'])
 
 
-class MemoryStorage(object):
+class Storage(object):
+    def get(self, key, range_key):
+        return Item.from_db_data(key, self._get(key, range_key))
+
+    def insert(self, item):
+        self._insert(item.key, item.range_key, item.to_string())
+
+    def update(self, item):
+        self._update(item.key, item.range_key, item.to_string())
+
+    def query(self, key, range_min, range_max):
+        out = list()
+        for i in self._query(key, range_min, range_max):
+            out.append(Item.from_db_data(key, i))
+        return out
+
+    def last(self, key):
+        return Item.from_db_data(key, self._last(key))
+
+    def first(self, key):
+        return Item.from_db_data(key, self._first(key))
+
+    def left(self, key, range_key):
+        return Item.from_db_data(key, self._left(key, range_key))
+
+
+class RedisStorage(Storage):
+    def __init__(self, expire=None, **kwargs):
+        if expire is not None:
+            self.expire = expire
+        else:
+            self.expire = False
+        self.redis = Redis(**kwargs)
+
+    def _insert(self, key, range_key, data):
+        self.redis.zadd(key, range_key, data)
+        if self.expire:
+            self.redis.expire(key, self.expire)
+
+    def _get(self, key, range_key):
+        l = self.redis.zrevrangebyscore(key, min=range_key, max=range_key,
+                                        start=0, num=1)
+        if len(l) < 1:
+            raise NotFoundError
+        return l[0]
+
+    def _first(self, key):
+        i = self.redis.zrangebyscore(key, min="-inf", max="+inf",
+                                     start=0, num=1)
+        if len(i) < 1:
+            raise NotFoundError
+        return i[0]
+
+    def _last(self, key):
+        i = self.redis.zrevrangebyscore(key, min="-inf", max="+inf",
+                                        start=0, num=1)
+        if len(i) < 1:
+            raise NotFoundError
+        return i[0]
+
+    def _left(self, key, range_key):
+        i = self.redis.zrevrangebyscore(key, min="-inf", max=range_key,
+                                        start=0, num=1)
+        if len(i) < 1:
+            raise NotFoundError
+        return i[0]
+
+    def _update(self, key, range_key, data):
+        p = self.redis.pipeline()
+        p.zremrangebyscore(key, min=range_key, max=range_key)
+        p.zadd(key, range_key, data)
+        if self.expire:
+            p.expire(key, self.expire)
+        p.execute()
+
+    def _query(self, key, range_min, range_max):
+        items = self.redis.zrangebyscore(key, min=range_min, max=range_max)
+        try:
+            left = self._left(key, range_min)
+        except NotFoundError:
+            return items
+        if len(items) > 0 and left == items[0]:
+            pass
+        else:
+            items.insert(0, left)
+        return items
+
+
+class MemoryStorage(Storage):
     def __init__(self):
         self.cache = {}
+
+    def _left(self, key, range_key):
+        idx = self._le(key, range_key)
+        return self._at(key, idx).data
 
     def _get_key(self, key):
         if key not in self.cache:
@@ -59,7 +152,7 @@ class MemoryStorage(object):
 
     def _get(self, key, range_key):
         i = self._index(key, range_key)
-        return self._at(key, i)
+        return self._at(key, i).data
 
     def _query(self, key, range_min, range_max):
         m = self._ge(key, range_min)
@@ -67,37 +160,16 @@ class MemoryStorage(object):
         # Get one before maybe there is a range key inside
         if m > 0:
             m -= 1
-        return self._slice(key, m, e)
+        return [x.data for x in self._slice(key, m, e)]
 
     def _last(self, key):
         k = self._get_key(key)
         if len(k) > 0:
-            return k[-1]
+            return k[-1].data
         raise NotFoundError
 
     def _first(self, key):
         k = self._get_key(key)
         if len(k) > 0:
-            return k[0]
+            return k[0].data
         raise NotFoundError
-
-    def get(self, key, range_key):
-        return Item.from_db_data(key, self._get(key, range_key).data)
-
-    def insert(self, item):
-        self._insert(item.key, item.range_key, item.to_string())
-
-    def update(self, item):
-        self._update(item.key, item.range_key, item.to_string())
-
-    def query(self, key, range_min, range_max):
-        out = list()
-        for i in self._query(key, range_min, range_max):
-            out.append(Item.from_db_data(key, i.data))
-        return out
-
-    def last(self, key):
-        return Item.from_db_data(key, self._last(key).data)
-
-    def first(self, key):
-        return Item.from_db_data(key, self._first(key).data)
