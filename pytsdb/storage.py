@@ -159,12 +159,15 @@ class CassandraStorage(Storage):
 
 
 class RedisStorage(Storage):
-    def __init__(self, expire=None, **kwargs):
+    def __init__(self, redis=None, expire=None, **kwargs):
         if expire is not None:
             self.expire = expire
         else:
             self.expire = False
-        self.redis = Redis(**kwargs)
+        if redis is not None:
+            self.redis = redis
+        else:
+            self.redis = Redis(**kwargs)
 
     def _to_item(self, key, data):
         return Item.from_db_data(key, data)

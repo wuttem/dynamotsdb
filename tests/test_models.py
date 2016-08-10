@@ -26,12 +26,11 @@ class ModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
-        pass
 
     def test_aggregations(self):
         ts = to_ts(datetime.datetime(2000, 1, 1, 0, 0))
         items = []
-        for i in range(10):
+        for _ in range(10):
             items.append(Item("d"))
             for j in range(144):
                 items[-1].insert_point(ts + j * 600, float(j % 6))
