@@ -6,7 +6,7 @@ import logging
 import os
 
 
-from pytsdb.storage import MemoryStorage, RedisStorage
+from pytsdb.storage import MemoryStorage, RedisStorage, CassandraStorage
 
 
 class StorageTest(unittest.TestCase):
@@ -23,6 +23,67 @@ class StorageTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pass
+
+    def test_cassandrastore(self):
+        cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
+        cassandra_port = os.getenv('CASSANDRA_PORT', 9042)
+        l = CassandraStorage(contact_points=[cassandra_host], port=cassandra_port)
+        l._createTable()
+        self.assertTrue(l)
+        l._insert(key="test.ph", range_key=1000, data="bar1")
+        l._insert(key="test.ph", range_key=2000, data="bar4")
+        l._insert(key="test.ph", range_key=1100, data="bar2")
+        l._insert(key="test.ph", range_key=1200, data="bar3")
+
+        d = l._get(key="test.ph", range_key=1000)
+        self.assertEqual(d, b"bar1")
+        d = l._get(key="test.ph", range_key=1100)
+        self.assertEqual(d, b"bar2")
+        d = l._get(key="test.ph", range_key=1200)
+        self.assertEqual(d, b"bar3")
+        d = l._get(key="test.ph", range_key=2000)
+        self.assertEqual(d, b"bar4")
+
+        ds = l._query(key="test.ph", range_min=1000, range_max=1000)
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0], b"bar1")
+
+        ds = l._query(key="test.ph", range_min=-1000, range_max=1000)
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds[0], b"bar1")
+
+        ds = l._query(key="test.ph", range_min=-999, range_max=999)
+        self.assertEqual(len(ds), 0)
+
+        ds = l._query(key="test.ph", range_min=1000, range_max=1200)
+        self.assertEqual(len(ds), 3)
+        self.assertEqual(ds[0], b"bar1")
+        self.assertEqual(ds[1], b"bar2")
+        self.assertEqual(ds[2], b"bar3")
+
+        ds = l._query(key="test.ph", range_min=99, range_max=1350)
+        self.assertEqual(len(ds), 3)
+        self.assertEqual(ds[0], b"bar1")
+        self.assertEqual(ds[1], b"bar2")
+        self.assertEqual(ds[2], b"bar3")
+
+        ds = l._query(key="test.ph", range_min=1101, range_max=1200)
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds[0], b"bar2")
+        self.assertEqual(ds[1], b"bar3")
+
+        ds = l._query(key="test.ph", range_min=99, range_max=999999)
+        self.assertEqual(len(ds), 4)
+        self.assertEqual(ds[0], b"bar1")
+        self.assertEqual(ds[1], b"bar2")
+        self.assertEqual(ds[2], b"bar3")
+        self.assertEqual(ds[3], b"bar4")
+
+        d = l._last(key="test.ph")
+        self.assertEqual(d, b"bar4")
+
+        d = l._first(key="test.ph")
+        self.assertEqual(d, b"bar1")
 
     def test_redisstore(self):
         redis_host = os.getenv('REDIS_HOST', 'localhost')

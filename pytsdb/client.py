@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import re
 import logging
 
-from .storage import MemoryStorage, RedisStorage
+from .storage import MemoryStorage, RedisStorage, CassandraStorage
 from .models import Item, ResultSet
 from .errors import NotFoundError
 
@@ -18,6 +18,8 @@ class TSDB(object):
             self.storage = MemoryStorage()
         elif storage == "redis":
             self.storage = RedisStorage()
+        elif storage == "cassandra":
+            self.storage = CassandraStorage()
         else:
             raise NotImplementedError("Storage not implemented")
         self.settings = {

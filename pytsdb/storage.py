@@ -4,6 +4,7 @@
 from __future__ import unicode_literals
 import bisect
 from redis import StrictRedis as Redis
+from cassandra.cluster import Cluster
 from collections import namedtuple
 from .errors import NotFoundError, ConflictError
 from .models import Item
@@ -36,6 +37,110 @@ class Storage(object):
 
     def left(self, key, range_key):
         return Item.from_db_data(key, self._left(key, range_key))
+
+
+class CassandraStorage(Storage):
+    def __init__(self, **kwargs):
+        self._cassandra = Cluster(**kwargs)
+        self._session = None
+        self.key_space = "test"
+        self.table_name = "{}.testtable".format(self.key_space)
+
+    @property
+    def cassandra(self):
+        if self._session is None:
+            self._session = self._cassandra.connect()
+        return self._session
+
+    def _createTable(self):
+        k = """
+            CREATE KEYSPACE IF NOT EXISTS {} WITH
+            REPLICATION =
+            {{ 'class' : 'SimpleStrategy',
+              'replication_factor' : 1 }};""".format(self.key_space)
+        self.cassandra.execute(k)
+        s = """
+            CREATE TABLE IF NOT EXISTS {} (
+            key text,
+            range_key int,
+            data blob,
+            PRIMARY KEY (key, range_key)
+            )""".format(self.table_name)
+        self.cassandra.execute(s)
+
+    def _insert(self, key, range_key, data):
+        s = """
+            INSERT INTO {} (key, range_key, data)
+            VALUES (%s, %s, %s)
+            """.format(self.table_name)
+        self.cassandra.execute(s, (key, range_key, bytearray(data)))
+
+    def _get(self, key, range_key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = %s AND range_key = %s
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, range_key))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0].data
+
+    def _first(self, key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = %s ORDER BY range_key ASC LIMIT 1
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, ))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0].data
+
+    def _last(self, key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = %s ORDER BY range_key DESC LIMIT 1
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, ))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0].data
+
+    def _left(self, key, range_key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = %s AND range_key <= %s ORDER BY range_key DESC LIMIT 1
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, range_key))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0].data
+
+    def _update(self, key, range_key, data):
+        self._insert(key, range_key, data)
+
+    def _query(self, key, range_min, range_max):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = %s AND range_key >= %s AND range_key <= %s
+            ORDER BY range_key ASC
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, range_min, range_max))
+        items = []
+        for r in res:
+            items.append(r.data)
+        try:
+            left = self._left(key, range_min)
+        except NotFoundError:
+            return items
+        if len(items) > 0 and left == items[0]:
+            pass
+        else:
+            items.insert(0, left)
+        return items
 
 
 class RedisStorage(Storage):

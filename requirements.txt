@@ -1,4 +1,5 @@
 enum34>=1.1.2
+cassandra-driver>=3.6.0
 boto>=2.38.0
 pytest>=2.8.5
 coverage>=4.0.3
