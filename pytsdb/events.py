@@ -38,10 +38,12 @@ class RedisPubSub(object):
         self._pubsub.close()
 
     def new_data(self, key, range_min, range_max):
+        key = "{}".format(key)
         self._redis.publish(key, json.dumps({"range_min": range_min,
                                              "range_max": range_max}))
 
     def register_callback(self, key, callback):
+        key = "{}".format(key)
         self._callbacks[key] = callback
         self._pubsub.psubscribe(**{key: self._route_callback})
         self.start()
