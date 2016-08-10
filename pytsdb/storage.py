@@ -14,29 +14,35 @@ Element = namedtuple('Element', ['key', 'range_key', 'data'])
 
 
 class Storage(object):
+    def _to_item(self, key, data):
+        raise NotImplementedError("child class must implement _to_item")
+
+    def _from_item(self, item):
+        raise NotImplementedError("child class must implement _from_item")
+
     def get(self, key, range_key):
-        return Item.from_db_data(key, self._get(key, range_key))
+        return self._to_item(key, self._get(key, range_key))
 
     def insert(self, item):
-        self._insert(item.key, item.range_key, item.to_string())
+        self._insert(**self._from_item(item))
 
     def update(self, item):
-        self._update(item.key, item.range_key, item.to_string())
+        self._update(**self._from_item(item))
 
     def query(self, key, range_min, range_max):
         out = list()
         for i in self._query(key, range_min, range_max):
-            out.append(Item.from_db_data(key, i))
+            out.append(self._to_item(key, i))
         return out
 
     def last(self, key):
-        return Item.from_db_data(key, self._last(key))
+        return self._to_item(key, self._last(key))
 
     def first(self, key):
-        return Item.from_db_data(key, self._first(key))
+        return self._to_item(key, self._first(key))
 
     def left(self, key, range_key):
-        return Item.from_db_data(key, self._left(key, range_key))
+        return self._to_item(key, self._left(key, range_key))
 
 
 class CassandraStorage(Storage):
@@ -68,12 +74,20 @@ class CassandraStorage(Storage):
             )""".format(self.table_name)
         self.cassandra.execute(s)
 
+    def _to_item(self, key, data):
+        return Item.from_db_data(key, data)
+
+    def _from_item(self, item):
+        return {"key": item.key,
+                "range_key": item.range_key,
+                "data": item.to_string()}
+
     def _insert(self, key, range_key, data):
         s = """
             INSERT INTO {} (key, range_key, data)
             VALUES (%s, %s, %s)
             """.format(self.table_name)
-        data = bytearray(bytes(data))
+        data = bytearray(data)
         self.cassandra.execute(s, (key, range_key, data))
 
     def _get(self, key, range_key):
@@ -152,6 +166,14 @@ class RedisStorage(Storage):
             self.expire = False
         self.redis = Redis(**kwargs)
 
+    def _to_item(self, key, data):
+        return Item.from_db_data(key, data)
+
+    def _from_item(self, item):
+        return {"key": item.key,
+                "range_key": item.range_key,
+                "data": item.to_string()}
+
     def _insert(self, key, range_key, data):
         self.redis.zadd(key, range_key, data)
         if self.expire:
@@ -209,6 +231,14 @@ class RedisStorage(Storage):
 class MemoryStorage(Storage):
     def __init__(self):
         self.cache = {}
+
+    def _to_item(self, key, data):
+        return Item.from_db_data(key, data)
+
+    def _from_item(self, item):
+        return {"key": item.key,
+                "range_key": item.range_key,
+                "data": item.to_string()}
 
     def _left(self, key, range_key):
         idx = self._le(key, range_key)

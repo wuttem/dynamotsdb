@@ -5,8 +5,11 @@ import unittest
 import random
 import logging
 import binascii
+import datetime
 
 from pytsdb.models import Item, ItemType, Aggregation, TupleArray
+from pytsdb.models import ResultSet
+from pytsdb.helper import to_ts
 
 
 class ModelTest(unittest.TestCase):
@@ -24,6 +27,79 @@ class ModelTest(unittest.TestCase):
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
         pass
+
+    def test_aggregations(self):
+        ts = to_ts(datetime.datetime(2000, 1, 1, 0, 0))
+        items = []
+        for i in range(10):
+            items.append(Item("d"))
+            for j in range(144):
+                items[-1].insert_point(ts + j * 600, float(j % 6))
+            ts += 144 * 600
+
+        res = ResultSet("d", items)
+        # All
+        self.assertEqual(len(list(res.all())), 144 * 10)
+
+        # Daily
+        daily = list(res.daily())
+        self.assertEqual(len(daily), 10)
+        self.assertEqual(len(list(daily[0])), 144)
+
+        # Daily Aggr
+        g = res.aggregation("daily", "sum")
+        for x in g:
+            self.assertEqual(x[1], 360.0)
+
+        g = res.aggregation("daily", "count")
+        for x in g:
+            self.assertEqual(x[1], 144)
+
+        g = res.aggregation("daily", "mean")
+        for x in g:
+            self.assertEqual(x[1], 2.5)
+
+        g = res.aggregation("daily", "min")
+        for x in g:
+            self.assertEqual(x[1], 0.0)
+
+        g = res.aggregation("daily", "max")
+        for x in g:
+            self.assertEqual(x[1], 5.0)
+
+        g = res.aggregation("daily", "amp")
+        for x in g:
+            self.assertEqual(x[1], 5.0)
+
+        # Hourly
+        daily = list(res.daily())
+        self.assertEqual(len(daily), 10)
+        self.assertEqual(len(list(daily[0])), 144)
+
+        # Hourly Aggr
+        g = res.aggregation("hourly", "sum")
+        for x in g:
+            self.assertEqual(x[1], 15.0)
+
+        g = res.aggregation("hourly", "count")
+        for x in g:
+            self.assertEqual(x[1], 6)
+
+        g = res.aggregation("hourly", "mean")
+        for x in g:
+            self.assertEqual(x[1], 2.5)
+
+        g = res.aggregation("hourly", "min")
+        for x in g:
+            self.assertEqual(x[1], 0.0)
+
+        g = res.aggregation("hourly", "max")
+        for x in g:
+            self.assertEqual(x[1], 5.0)
+
+        g = res.aggregation("hourly", "amp")
+        for x in g:
+            self.assertEqual(x[1], 5.0)
 
     def test_item(self):
         i1 = Item("test", item_type=ItemType.tuple_float_3)
@@ -77,7 +153,7 @@ class ModelTest(unittest.TestCase):
         i = Item("ph")
         i.insert(d)
         self.assertEqual(len(i), 100)
-        buckets = i.split_item(30)
+        buckets = i._split_item(30)
         self.assertEqual(len(buckets), 4)
         self.assertEqual(len(buckets[0]), 30)
         self.assertEqual(len(buckets[1]), 30)

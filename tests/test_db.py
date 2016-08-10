@@ -31,7 +31,7 @@ class StorageTest(unittest.TestCase):
             d._insert("hüü", [(1, 1.1)])
 
     def test_merge(self):
-        d = TSDB(BUCKETSIZE_TARGET=2, BUCKETSIZE_MAX=2)
+        d = TSDB(BUCKET_DYNAMIC_TARGET=2, BUCKET_DYNAMIC_MAX=2)
         d._insert("merge", [(1, 2.0), (2, 3.0), (5, 6.0), (6, 7.0),
                             (9, 10.0), (0, 1.0)])
         res = d._query("merge", 0, 10)
@@ -48,7 +48,7 @@ class StorageTest(unittest.TestCase):
             self.assertAlmostEqual(float(ts + 1.0), v)
 
     def test_basic(self):
-        d = TSDB(BUCKETSIZE_TARGET=3, BUCKETSIZE_MAX=3)
+        d = TSDB(BUCKET_DYNAMIC_TARGET=3, BUCKET_DYNAMIC_MAX=3)
         d._insert("hi", [(1, 1.1), (2, 2.2)])
         d._insert("hi", [(4, 4.4)])
         i = d.storage.last("hi")
@@ -98,7 +98,7 @@ class StorageTest(unittest.TestCase):
         s.insert(2000, s.pop(1800))
 
         # Insert
-        d = TSDB(BUCKETSIZE_TARGET=100)
+        d = TSDB(BUCKET_DYNAMIC_TARGET=100)
         for p in s:
             d._insert("ph", p)
 

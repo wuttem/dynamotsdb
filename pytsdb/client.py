@@ -5,7 +5,7 @@ import re
 import logging
 
 from .storage import MemoryStorage, RedisStorage, CassandraStorage
-from .models import Item, ResultSet
+from .models import Item, ResultSet, BucketType
 from .errors import NotFoundError
 
 
@@ -14,27 +14,43 @@ logger = logging.getLogger(__name__)
 
 class TSDB(object):
     def __init__(self, storage="memory", **kwargs):
+        self.settings = {
+            "BUCKET_TYPE": "dynamic",
+            "BUCKET_DYNAMIC_TARGET": 100,
+            "BUCKET_DYNAMIC_MAX": 200,
+            "REDIS_PORT": 6379,
+            "REDIS_HOST": "localhost",
+            "REDIS_DB": 0,
+            "CASSANDRA_PORT": 9042,
+            "CASSANDRA_HOST": "localhost"
+        }
+        self.settings.update(kwargs)
+
+        # Setup Item Model
+        Item.DYNAMICSIZE_TARGET = self.settings["BUCKET_DYNAMIC_TARGET"]
+        Item.DYNAMICSIZE_MAX = self.settings["BUCKET_DYNAMIC_MAX"]
+        Item.DEFAULT_BUCKETTYPE = BucketType[self.settings["BUCKET_TYPE"]]
+
+        # Setup Storage
         if storage == "memory":
             self.storage = MemoryStorage()
         elif storage == "redis":
-            self.storage = RedisStorage()
+            self.storage = RedisStorage(
+                host=self.settings["REDIS_HOST"],
+                port=self.settings["REDIS_PORT"],
+                db=self.settings["REDIS_DB"])
         elif storage == "cassandra":
-            self.storage = CassandraStorage()
+            self.storage = CassandraStorage(
+                contact_points=[self.settings["CASSANDRA_HOST"]],
+                port=self.settings["CASSANDRA_PORT"])
         else:
             raise NotImplementedError("Storage not implemented")
-        self.settings = {
-            "BUCKETSIZE_TARGET": 100,
-            "BUCKETSIZE_MAX": 200
-        }
-        self.settings.update(kwargs)
-        Item.DYNAMICSIZE_TARGET = self.settings["BUCKETSIZE_TARGET"]
-        Item.DYNAMICSIZE_MAX = self.settings["BUCKETSIZE_MAX"]
 
     def _get_last_item_or_new(self, key):
         try:
             item = self.storage.last(key)
         except NotFoundError:
-            item = Item(key)
+            item = Item.new(key)
         return item
 
     def _get_items_between(self, key, ts_min, ts_max):
@@ -111,7 +127,7 @@ class TSDB(object):
                 logger.debug("Fragmentation, No Split")
                 updated_splitted.append(i)
             else:
-                splited = i.split_item(self.settings["BUCKETSIZE_TARGET"])
+                splited = i.split_item()
                 logger.debug("Split needed")
                 for j in splited:
                     updated_splitted.append(j)

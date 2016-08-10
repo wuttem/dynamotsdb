@@ -13,9 +13,11 @@ from collections import namedtuple
 
 import bisect
 import logging
-import itertools
 import struct
 import array
+
+from .helper import ts_daily_left, ts_daily_right
+from .helper import ts_hourly_left, ts_hourly_right
 
 
 Aggregation = namedtuple('Aggregation', ['min', 'max', 'sum', 'count'])
@@ -99,6 +101,8 @@ class TupleArray(MutableSequence):
 
 class Item(object):
     HEADER_SIZE = 8
+    DEFAULT_ITEMTYPE = ItemType.raw_float
+    DEFAULT_BUCKETTYPE = BucketType.dynamic
     DYNAMICSIZE_TARGET = 100
     DYNAMICSIZE_MAX = 190
 
@@ -126,6 +130,13 @@ class Item(object):
         self.key = str(key).lower()
         self.item_type = item_type
         self.bucket_type = bucket_type
+
+    @classmethod
+    def new(cls, key, values=None):
+        """Factory Method to create Items.
+        """
+        return cls(key, values, item_type=cls.DEFAULT_ITEMTYPE,
+                   bucket_type=cls.DEFAULT_BUCKETTYPE)
 
     @property
     def range_key(self):
@@ -224,7 +235,10 @@ class Item(object):
         return (header + length + self._timestamps.tostring() +
                 self._values.tostring())
 
-    def split_item(self, count):
+    def split_item(self):
+        return self._split_item(count=Item.DYNAMICSIZE_TARGET)
+
+    def _split_item(self, count):
         if count >= len(self._timestamps):
             raise ValueError("split to big")
         splits = list(range(count, len(self._timestamps), count))
@@ -308,4 +322,75 @@ class ResultSet(Item):
         self._values = self._values[low:high]
 
     def all(self):
+        """Return an iterater to get all ts value pairs.
+        """
         return zip(self._timestamps, self._values)
+
+    def daily(self):
+        """Generator to access daily data.
+        This will return an inner generator.
+        """
+        i = 0
+        while i < len(self._timestamps):
+            j = 0
+            lower_bound = ts_daily_left(self._timestamps[i])
+            upper_bound = ts_daily_right(self._timestamps[i])
+            while (i + j < len(self._timestamps) and
+                   lower_bound <= self._timestamps[i + j] <= upper_bound):
+                j += 1
+            yield ((self._timestamps[x], self._values[x])
+                   for x in range(i, i + j))
+            i += j
+
+    def hourly(self):
+        """Generator to access hourly data.
+        This will return an inner generator.
+        """
+        i = 0
+        while i < len(self._timestamps):
+            j = 0
+            lower_bound = ts_hourly_left(self._timestamps[i])
+            upper_bound = ts_hourly_right(self._timestamps[i])
+            while (i + j < len(self._timestamps) and
+                   lower_bound <= self._timestamps[i + j] <= upper_bound):
+                j += 1
+            yield ((self._timestamps[x], self._values[x])
+                   for x in range(i, i + j))
+            i += j
+
+    def aggregation(self, group="hourly", function="mean"):
+        """Aggregation Generator.
+        """
+        if group == "hourly":
+            it = self.hourly
+            left = ts_hourly_left
+        elif group == "daily":
+            it = self.daily
+            left = ts_daily_left
+        else:
+            raise ValueError("Invalid aggregation group")
+
+        if function == "sum":
+            func = sum
+        elif function == "count":
+            func = len
+        elif function == "min":
+            func = min
+        elif function == "max":
+            func = max
+        elif function == "amp":
+            def amp(x):
+                return max(x) - min(x)
+            func = amp
+        elif function == "mean":
+            def mean(x):
+                return sum(x) / len(x)
+            func = mean
+        else:
+            raise ValueError("Invalid aggregation group")
+
+        for g in it():
+            t = list(g)
+            ts = left(t[0][0])
+            value = func([x[1] for x in t])
+            yield (ts, value)
