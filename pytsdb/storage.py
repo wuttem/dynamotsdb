@@ -73,8 +73,7 @@ class CassandraStorage(Storage):
             INSERT INTO {} (key, range_key, data)
             VALUES (%s, %s, %s)
             """.format(self.table_name)
-        if isinstance(data, (str, unicode)):
-            data = bytearray(data, "utf-8")
+        data = bytearray(bytes(data))
         self.cassandra.execute(s, (key, range_key, data))
 
     def _get(self, key, range_key):
