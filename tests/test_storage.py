@@ -31,7 +31,7 @@ class StorageTest(unittest.TestCase):
         l._createTable()
         self.assertTrue(l)
         l._insert(key="test.ph", range_key=1000, data="bar1")
-        l._insert(key="test.ph", range_key=2000, data="bär4")
+        l._insert(key="test.ph", range_key=2000, data="bar4")
         l._insert(key="test.ph", range_key=1100, data="bar2")
         l._insert(key="test.ph", range_key=1200, data="bar3")
 
@@ -42,7 +42,7 @@ class StorageTest(unittest.TestCase):
         d = l._get(key="test.ph", range_key=1200)
         self.assertEqual(d, b"bar3")
         d = l._get(key="test.ph", range_key=2000)
-        self.assertEqual(d, b"bär4")
+        self.assertEqual(d, b"bar4")
 
         ds = l._query(key="test.ph", range_min=1000, range_max=1000)
         self.assertEqual(len(ds), 1)
@@ -77,10 +77,10 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(ds[0], b"bar1")
         self.assertEqual(ds[1], b"bar2")
         self.assertEqual(ds[2], b"bar3")
-        self.assertEqual(ds[3], b"bär4")
+        self.assertEqual(ds[3], b"bar4")
 
         d = l._last(key="test.ph")
-        self.assertEqual(d, b"bär4")
+        self.assertEqual(d, b"bar4")
 
         d = l._first(key="test.ph")
         self.assertEqual(d, b"bar1")
@@ -91,7 +91,7 @@ class StorageTest(unittest.TestCase):
         l = RedisStorage(host=redis_host, port=redis_port, db=0, expire=5)
         self.assertTrue(l)
         l._insert(key="test.ph", range_key=1000, data="bar1")
-        l._insert(key="test.ph", range_key=2000, data="bär4")
+        l._insert(key="test.ph", range_key=2000, data="bar4")
         l._insert(key="test.ph", range_key=1100, data="bar2")
         l._insert(key="test.ph", range_key=1200, data="bar3")
 
@@ -102,7 +102,7 @@ class StorageTest(unittest.TestCase):
         d = l._get(key="test.ph", range_key=1200)
         self.assertEqual(d, b"bar3")
         d = l._get(key="test.ph", range_key=2000)
-        self.assertEqual(d, b"bär4")
+        self.assertEqual(d, b"bar4")
 
         ds = l._query(key="test.ph", range_min=1000, range_max=1000)
         self.assertEqual(len(ds), 1)
@@ -137,10 +137,10 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(ds[0], b"bar1")
         self.assertEqual(ds[1], b"bar2")
         self.assertEqual(ds[2], b"bar3")
-        self.assertEqual(ds[3], b"bär4")
+        self.assertEqual(ds[3], b"bar4")
 
         d = l._last(key="test.ph")
-        self.assertEqual(d, b"bär4")
+        self.assertEqual(d, b"bar4")
 
         d = l._first(key="test.ph")
         self.assertEqual(d, b"bar1")
