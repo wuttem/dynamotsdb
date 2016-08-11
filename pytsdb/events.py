@@ -50,7 +50,7 @@ class RedisPubSub(object):
 
     def _route_callback(self, message):
         logger.info("Incomming Event: {}".format(message))
-        pattern = "{}".format(message["pattern"])
+        pattern = message["pattern"].decode("utf-8")
         if pattern in self._callbacks:
             self._callbacks[pattern](message["channel"],
                                      info=json.loads(message["data"]))
