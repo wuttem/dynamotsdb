@@ -23,7 +23,6 @@ class StorageTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
-        pass
 
     def test_invalidmetricname(self):
         with self.assertRaises(ValueError):
