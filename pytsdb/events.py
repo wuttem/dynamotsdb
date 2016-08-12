@@ -29,7 +29,7 @@ class RedisPubSub(object):
             #                                          daemon=True)
 
     def stop(self):
-        if self._thread:
+        if self._thread is not None:
             self._thread.stop()
             self._thread = None
 

@@ -51,3 +51,6 @@ class EventTest(unittest.TestCase):
         self.assertEqual(messages[1][0], "device.abc")
         self.assertEqual(messages[1][1]["range_min"], 2)
         self.assertEqual(messages[1][1]["range_max"], 2)
+
+        time.sleep(0.5)
+        self.r.close()

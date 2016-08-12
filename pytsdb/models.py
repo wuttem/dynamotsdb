@@ -168,6 +168,8 @@ class Item(object):
         return all(b >= a for a, b in zip(self._timestamps, it))
 
     def __eq__(self, other):
+        if not isinstance(other, Item):
+            return False
         if self.key != other.key:
             return False
         if self.item_type != other.item_type:
