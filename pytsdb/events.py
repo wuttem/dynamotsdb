@@ -52,7 +52,7 @@ class RedisPubSub(object):
         logger.info("Incomming Event: {}".format(message))
         pattern = message["pattern"].decode("utf-8")
         if pattern in self._callbacks:
-            self._callbacks[pattern](message["channel"],
+            self._callbacks[pattern](message["channel"].decode("utf-8"),
                                      info=json.loads(message["data"]
                                                      .decode("utf-8")))
         else:
