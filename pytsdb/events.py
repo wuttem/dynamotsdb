@@ -53,6 +53,7 @@ class RedisPubSub(object):
         pattern = message["pattern"].decode("utf-8")
         if pattern in self._callbacks:
             self._callbacks[pattern](message["channel"],
-                                     info=json.loads(message["data"]))
+                                     info=json.loads(message["data"]
+                                                     .decode("utf-8")))
         else:
             logger.warning("no callback found")
