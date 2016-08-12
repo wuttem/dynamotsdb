@@ -37,10 +37,9 @@ class RedisPubSub(object):
         self.stop()
         self._pubsub.close()
 
-    def new_data(self, key, range_min, range_max):
+    def new_data(self, key, stats):
         key = "{}".format(key)
-        self._redis.publish(key, json.dumps({"range_min": range_min,
-                                             "range_max": range_max}))
+        self._redis.publish(key, json.dumps(stats))
 
     def register_callback(self, key, callback):
         key = "{}".format(key)

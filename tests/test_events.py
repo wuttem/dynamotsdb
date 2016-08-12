@@ -34,18 +34,18 @@ class EventTest(unittest.TestCase):
         self.r.register_callback("device.*", test_function)
 
         self.assertEqual(len(messages), 0)
-        self.r.new_data("xyz", 1, 2)
+        self.r.new_data("xyz", {"range_min": 1, "range_max": 2})
         time.sleep(0.1)
         self.assertEqual(len(messages), 0)
 
-        self.r.new_data("device.xyz", 1, 2)
+        self.r.new_data("device.xyz", {"range_min": 1, "range_max": 2})
         time.sleep(0.1)
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0][0], "device.xyz")
         self.assertEqual(messages[0][1]["range_min"], 1)
         self.assertEqual(messages[0][1]["range_max"], 2)
 
-        self.r.new_data("device.abc", 2, 2)
+        self.r.new_data("device.abc", {"range_min": 2, "range_max": 2})
         time.sleep(0.1)
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[1][0], "device.abc")

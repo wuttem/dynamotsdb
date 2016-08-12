@@ -5,6 +5,7 @@ import re
 import logging
 
 from .storage import MemoryStorage, RedisStorage, CassandraStorage
+from .events import RedisPubSub
 from .models import Item, ResultSet, BucketType
 from .errors import NotFoundError
 
@@ -45,6 +46,16 @@ class TSDB(object):
                 port=self.settings["CASSANDRA_PORT"])
         else:
             raise NotImplementedError("Storage not implemented")
+
+        self.events = RedisPubSub(host=self.settings["REDIS_HOST"],
+                                  port=self.settings["REDIS_PORT"],
+                                  db=self.settings["REDIS_DB"])
+
+    def _register_data_listener(self, key, callback):
+        self.events.register_callback(key, callback)
+
+    def _close(self):
+        self.events.close()
 
     def _get_last_item_or_new(self, key):
         try:
@@ -138,5 +149,7 @@ class TSDB(object):
             self._insert_or_update_item(i)
             stats["updated"] += 1
 
+        # Update Events
+        self.events.new_data(key, stats)
         logger.debug("Insert Finished {}".format(stats))
         return stats
