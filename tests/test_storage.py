@@ -86,6 +86,8 @@ class StorageTest(unittest.TestCase):
         d = storage.first(key="test.ph")
         self.assertEqual(d[0], (1000, 1.0))
 
+        d = storage.left(key="test.ph", range_key=1050)
+        self.assertEqual(d[0], (1000, 1.0))
 
     def test_cassandrastore(self):
         cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')

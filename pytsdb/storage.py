@@ -270,7 +270,9 @@ class MemoryStorage(Storage):
     def _le(self, key, range_max):
         a = self._get_range_keys(key)
         i = bisect.bisect_right(a, range_max)
-        return i
+        if i and i > 0:
+            return i - 1
+        raise NotFoundError
 
     def _at(self, key, index):
         return self._get_key(key)[index]
@@ -295,7 +297,10 @@ class MemoryStorage(Storage):
 
     def _query(self, key, range_min, range_max):
         m = self._ge(key, range_min)
-        e = self._le(key, range_max)
+        try:
+            e = self._le(key, range_max) + 1
+        except NotFoundError:
+            return []
         # Get one before maybe there is a range key inside
         if m > 0:
             m -= 1
