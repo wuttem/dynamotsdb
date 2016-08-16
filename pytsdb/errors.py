@@ -10,3 +10,7 @@ class NotFoundError(KeyError):
 
 class ConflictError(ValueError):
     pass
+
+
+class InternalError(RuntimeError):
+    pass

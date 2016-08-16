@@ -5,10 +5,50 @@ from __future__ import unicode_literals
 
 import logging
 import json
+import sys
 from redis import StrictRedis as Redis
-
+from .errors import InternalError
 
 logger = logging.getLogger(__name__)
+
+
+class DataEvent(object):
+    def __init__(self, key, ts_min, ts_max, count,
+                 appended=0, inserted=0, updated=0, deleted=0):
+        self.key = key
+        self.ts_min = ts_min
+        self.ts_max = ts_max
+        self.count = count
+        self.appended = appended
+        self.inserted = inserted
+        self.updated = updated
+        self.deleted = deleted
+
+    def to_dict(self):
+        return {
+            "key": self.key,
+            "ts_min": self.ts_min,
+            "ts_max": self.ts_max,
+            "count": self.count,
+            "appended": self.appended,
+            "inserted": self.inserted,
+            "updated": self.updated,
+            "deleted": self.deleted,
+        }
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, s):
+        d = json.loads(s)
+        return cls(**d)
+
+    def __repr__(self):
+        return "Event({}, count: {} timestamps: {} - {}".format(self.key,
+                                                                self.count,
+                                                                self.ts_min,
+                                                                self.ts_max)
 
 
 class RedisPubSub(object):
@@ -37,9 +77,10 @@ class RedisPubSub(object):
         self.stop()
         self._pubsub.close()
 
-    def new_data(self, key, stats):
+    def publish_event(self, key, **kwargs):
         key = "{}".format(key)
-        self._redis.publish(key, json.dumps(stats))
+        ev = DataEvent(key=key, **kwargs)
+        self._redis.publish(key, ev.to_json())
 
     def register_callback(self, key, callback):
         key = "{}".format(key)
@@ -51,8 +92,14 @@ class RedisPubSub(object):
         logger.info("Incomming Event: {}".format(message))
         pattern = message["pattern"].decode("utf-8")
         if pattern in self._callbacks:
-            self._callbacks[pattern](message["channel"].decode("utf-8"),
-                                     info=json.loads(message["data"]
-                                                     .decode("utf-8")))
+            try:
+                event = DataEvent.from_json(message["data"].decode("utf-8"))
+                key = message["channel"].decode("utf-8")
+                self._callbacks[pattern](key=key, event=event)
+            except Exception as e:
+                # TODO Python 3 Exception chaining
+                type, value, traceback = sys.exc_info()
+                raise InternalError, ("callback raised exception"), traceback
         else:
             logger.warning("no callback found")
+            raise InternalError("no callback found")

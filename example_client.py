@@ -5,10 +5,15 @@ import time
 import random
 from pytsdb import TSDB
 
-def onData(key, info):
-    print("New Data: {} - {}".format(key, info))
 
 db = TSDB(storage="cassandra")
+
+def onData(key, event):
+    print("New: {}".format(event))
+    data = db._query(event.key, event.ts_min, event.ts_max)
+    print(data.pretty_print())
+    print("---")
+
 db._register_data_listener("temp", onData)
 
 try:

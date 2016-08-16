@@ -88,12 +88,14 @@ class TSDB(object):
         data.sort(key=lambda x: x[0])
 
         # Limits and Stats
-        ts_min = data[0][0]
-        ts_max = data[-1][0]
+        ts_min = int(data[0][0])
+        ts_max = int(data[-1][0])
+        count = len(data)
         logger.debug("Inserting {} {} points".format(key, len(data)))
         logger.debug("Limits: {} - {}".format(ts_min, ts_max))
-        stats = {"ts_min": ts_min, "ts_max": ts_max, "count": len(data),
-                 "updated": 0, "splits": 0, "merged": 0, "key": key}
+        stats = {"ts_min": ts_min, "ts_max": ts_max, "count": count,
+                 "appended": 0, "inserted": 0, "updated": 0, "key": key,
+                 "splits": 0, "merged": 0}
 
         # Find the last Item
         last_item = self._get_last_item_or_new(key)
@@ -105,8 +107,9 @@ class TSDB(object):
         # Just Append - Best Case
         if ts_min >= last_item.max_ts:
             logger.debug("Append Data")
-            last_item.insert(data)
+            appended = last_item.insert(data)
             updated.append(last_item)
+            stats["appended"] += appended
         else:
             # Merge Round
             merge_items = self._get_items_between(key, ts_min, ts_max)
@@ -116,15 +119,18 @@ class TSDB(object):
                          .format(ts_min, ts_max, len(merge_items)))
             i = len(data) - 1
             m = len(merge_items) - 1
+            inserted = 0
             while i >= 0:
                 last_merge_item = merge_items[m]
                 if data[i][0] >= last_merge_item.min_ts:
-                    last_merge_item.insert_point(data[i][0], data[i][1])
+                    inserted += last_merge_item.insert_point(data[i][0],
+                                                             data[i][1])
                     i -= 1
                 else:
                     m -= 1
             updated += merge_items
             stats["merged"] += len(merge_items)
+            stats["inserted"] += inserted
 
         # Splitting Round
         updated_splitted = []
@@ -144,12 +150,23 @@ class TSDB(object):
                     updated_splitted.append(j)
                 stats["splits"] += 1
 
-        # Update Round
-        for i in updated_splitted:
-            self._insert_or_update_item(i)
-            stats["updated"] += 1
+        # Update
+        if stats["inserted"] > 0 or stats["appended"] > 0:
+            # Update Round
+            for i in updated_splitted:
+                self._insert_or_update_item(i)
 
-        # Update Events
-        self.events.new_data(key, stats)
-        logger.debug("Insert Finished {}".format(stats))
+            # Update Event
+            self.events.publish_event(key=key,
+                                    ts_min=stats["ts_min"],
+                                    ts_max=stats["ts_max"],
+                                    count=stats["count"],
+                                    appended=stats["appended"],
+                                    inserted=stats["inserted"],
+                                    updated=stats["updated"],
+                                    deleted=0)
+            logger.debug("Insert Finished {}".format(stats))
+        else:
+            logger.info("Duplicate ... Nothing to do ...")
+
         return stats

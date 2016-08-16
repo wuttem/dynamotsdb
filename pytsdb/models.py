@@ -126,7 +126,7 @@ class Item(object):
         if values is not None:
             self.insert(values)
         self._dirty = False
-        self.existing = False
+        self._existing = False
         self.key = str(key).lower()
         self.item_type = item_type
         self.bucket_type = bucket_type
@@ -137,6 +137,14 @@ class Item(object):
         """
         return cls(key, values, item_type=cls.DEFAULT_ITEMTYPE,
                    bucket_type=cls.DEFAULT_BUCKETTYPE)
+
+    @property
+    def existing(self):
+        return self._existing
+
+    @property
+    def dirty(self):
+        return self._dirty
 
     @property
     def range_key(self):
@@ -277,7 +285,7 @@ class Item(object):
     @classmethod
     def from_db_data(cls, key, data):
         i = cls.from_string(key, data)
-        i.existing = True
+        i._existing = True
         return i
 
     def insert_point(self, timestamp, value, overwrite=False):
@@ -288,7 +296,7 @@ class Item(object):
             self._timestamps.append(timestamp)
             self._values.append(value)
             self._dirty = True
-            return
+            return 1
         # Already Existing
         if self._timestamps[idx] == timestamp:
             # Replace
@@ -296,15 +304,27 @@ class Item(object):
             if overwrite:
                 self._values[idx] = value
                 self._dirty = True
-            return
+                return 1
+            return 0
         # Normal Insert
         self._timestamps.insert(idx, timestamp)
         self._values.insert(idx, value)
         self._dirty = True
+        return 1
 
     def insert(self, series):
+        counter = 0
         for timestamp, value in series:
-            self.insert_point(timestamp, value)
+            counter += self.insert_point(timestamp, value)
+        return counter
+
+    def pretty_print(self):
+        lines = []
+        lines.append("{}: {} points({})".format(self.key, len(self),
+                                                self.item_type))
+        for i in range(len(self)):
+            lines.append("{}: {}".format(*self._at(i)))
+        return "\n".join(lines)
 
 
 class ResultSet(Item):

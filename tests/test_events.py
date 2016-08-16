@@ -29,28 +29,30 @@ class EventTest(unittest.TestCase):
 
     def test_callback(self):
         messages = []
-        def test_function(key, info):
-            messages.append((key, info))
+        def test_function(key, event):
+            messages.append((key, event))
         self.r.register_callback("device.*", test_function)
 
         self.assertEqual(len(messages), 0)
-        self.r.new_data("xyz", {"range_min": 1, "range_max": 2})
+        self.r.publish_event("xyz", ts_min=1, ts_max=2, count=2)
         time.sleep(0.1)
         self.assertEqual(len(messages), 0)
 
-        self.r.new_data("device.xyz", {"range_min": 1, "range_max": 2})
+        self.r.publish_event("device.xyz", ts_min=1, ts_max=2, count=2)
         time.sleep(0.1)
         self.assertEqual(len(messages), 1)
-        self.assertEqual(messages[0][0], "device.xyz")
-        self.assertEqual(messages[0][1]["range_min"], 1)
-        self.assertEqual(messages[0][1]["range_max"], 2)
+        self.assertEqual(messages[-1][0], "device.xyz")
+        self.assertEqual(messages[-1][1].ts_min, 1)
+        self.assertEqual(messages[-1][1].ts_max, 2)
+        self.assertEqual(messages[-1][1].count, 2)
 
-        self.r.new_data("device.abc", {"range_min": 2, "range_max": 2})
+        self.r.publish_event("device.abc", ts_min=2, ts_max=2, count=1)
         time.sleep(0.1)
         self.assertEqual(len(messages), 2)
-        self.assertEqual(messages[1][0], "device.abc")
-        self.assertEqual(messages[1][1]["range_min"], 2)
-        self.assertEqual(messages[1][1]["range_max"], 2)
+        self.assertEqual(messages[-1][0], "device.abc")
+        self.assertEqual(messages[-1][1].ts_min, 2)
+        self.assertEqual(messages[-1][1].ts_max, 2)
+        self.assertEqual(messages[-1][1].count, 1)
 
         time.sleep(0.5)
         self.r.close()
