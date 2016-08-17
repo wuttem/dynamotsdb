@@ -158,6 +158,115 @@ class CassandraStorage(Storage):
         return items
 
 
+class SQLiteStorage(Storage):
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.table_name = "datatable"
+        import sqlite3
+        self.conn = sqlite3.connect(filepath)
+
+    def _createTable(self):
+        c = self.conn.cursor()
+        s = """
+            CREATE TABLE IF NOT EXISTS {} (
+            key text,
+            range_key int,
+            data blob,
+            PRIMARY KEY (key, range_key)
+            )""".format(self.table_name)
+        c.execute(s)
+        self.conn.commit()
+
+    def _to_item(self, key, data):
+        return Item.from_db_data(key, data)
+
+    def _from_item(self, item):
+        return {"key": item.key,
+                "range_key": item.range_key,
+                "data": item.to_string()}
+
+    def _insert(self, key, range_key, data):
+        s = """
+            INSERT INTO {} (key, range_key, data)
+            VALUES (?, ?, ?)
+            """.format(self.table_name)
+        data = buffer(data)
+        c = self.conn.cursor()
+        c.execute(s, (key, range_key, data))
+
+    def _get(self, key, range_key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = ? AND range_key = ?
+            """.format(self.table_name)
+        c = self.conn.cursor()
+        res = c.execute(s, (key, range_key))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0][2]
+
+    def _first(self, key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = ? ORDER BY range_key ASC LIMIT 1
+            """.format(self.table_name)
+        c = self.conn.cursor()
+        res = c.execute(s, (key, ))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0][2]
+
+    def _last(self, key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = ? ORDER BY range_key DESC LIMIT 1
+            """.format(self.table_name)
+        c = self.conn.cursor()
+        res = c.execute(s, (key, ))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0][2]
+
+    def _left(self, key, range_key):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = ? AND range_key <= ? ORDER BY range_key DESC LIMIT 1
+            """.format(self.table_name)
+        c = self.conn.cursor()
+        res = c.execute(s, (key, range_key))
+        res = list(res)
+        if len(res) < 1:
+            raise NotFoundError
+        return res[0][2]
+
+    def _update(self, key, range_key, data):
+        self._insert(key, range_key, data)
+
+    def _query(self, key, range_min, range_max):
+        s = """
+            SELECT key, range_key, data FROM {}
+            WHERE key = ? AND range_key >= ? AND range_key <= ?
+            ORDER BY range_key ASC
+            """.format(self.table_name)
+        c = self.conn.cursor()
+        res = c.execute(s, (key, range_min, range_max))
+        items = []
+        for r in res:
+            items.append(r[2])
+        try:
+            left = self._left(key, range_min)
+        except NotFoundError:
+            return items
+        if len(items) > 0 and left == items[0]:
+            pass
+        else:
+            items.insert(0, left)
+        return items
+
+
 class RedisStorage(Storage):
     def __init__(self, redis=None, expire=None, **kwargs):
         if expire is not None:
