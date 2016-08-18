@@ -4,7 +4,6 @@
 from __future__ import unicode_literals
 import bisect
 from redis import StrictRedis as Redis
-from cassandra.cluster import Cluster
 from collections import namedtuple
 from .errors import NotFoundError, ConflictError
 from .models import Item
@@ -63,8 +62,10 @@ class Storage(object):
             count += i.count
         return count
 
+
 class CassandraStorage(Storage):
     def __init__(self, **kwargs):
+        from cassandra.cluster import Cluster
         self._cassandra = Cluster(**kwargs)
         self._session = None
         self.key_space = "test"

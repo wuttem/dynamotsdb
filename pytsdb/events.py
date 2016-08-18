@@ -60,6 +60,7 @@ class RedisPubSub(object):
         self._pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
         self._thread = None
         self._callbacks = {}
+        self._last_error = None
 
     def start(self):
         if not self._thread:
@@ -98,8 +99,10 @@ class RedisPubSub(object):
                 self._callbacks[pattern](key=key, event=event)
             except Exception as e:
                 # TODO Python 3 Exception chaining
-                type, value, traceback = sys.exc_info()
-                raise InternalError, ("callback raised exception"), traceback
+                t, value, traceback = sys.exc_info()
+                self._last_error = "{}\n{}\n{}".format(t, value, traceback)
+                logger.error(self._last_error)
+                # Do not raise
+                # raise InternalError, ("callback raised exception"), traceback
         else:
-            logger.warning("no callback found")
             raise InternalError("no callback found")

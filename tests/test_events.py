@@ -29,9 +29,9 @@ class EventTest(unittest.TestCase):
 
     def test_callback(self):
         messages = []
-        def test_function(key, event):
+        def test_function1(key, event):
             messages.append((key, event))
-        self.r.register_callback("device.*", test_function)
+        self.r.register_callback("device.*", test_function1)
 
         self.assertEqual(len(messages), 0)
         self.r.publish_event("xyz", ts_min=1, ts_max=2, count=2)
@@ -56,3 +56,12 @@ class EventTest(unittest.TestCase):
 
         time.sleep(0.5)
         self.r.close()
+
+    def test_raisingcallback(self):
+        def test_function2(key, event):
+            raise ValueError("Mein Fehler ...")
+        self.r.register_callback("device.*", test_function2)
+        self.assertEqual(self.r._last_error, None)
+        self.r.publish_event("device.xyz", ts_min=1, ts_max=2, count=2)
+        time.sleep(0.1)
+        self.assertIn("Mein Fehler", self.r._last_error)
