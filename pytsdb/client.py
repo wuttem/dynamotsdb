@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class TSDB(object):
     def __init__(self, storage="memory", **kwargs):
         self.settings = {
-            "BUCKET_TYPE": "dynamic",
+            "BUCKET_TYPE": "daily",
             "BUCKET_DYNAMIC_TARGET": 100,
             "BUCKET_DYNAMIC_MAX": 200,
             "REDIS_PORT": 6379,
@@ -105,7 +105,7 @@ class TSDB(object):
         updated = []
 
         # Just Append - Best Case
-        if ts_min >= last_item.max_ts:
+        if ts_min >= last_item.ts_max:
             logger.debug("Append Data")
             appended = last_item.insert(data)
             updated.append(last_item)
@@ -114,7 +114,7 @@ class TSDB(object):
             # Merge Round
             merge_items = self._get_items_between(key, ts_min, ts_max)
             assert(len(merge_items) > 0)
-            assert(merge_items[0].min_ts <= ts_min)
+            assert(merge_items[0].ts_min <= ts_min)
             logger.debug("Merging Data Query({} - {}) {} items"
                          .format(ts_min, ts_max, len(merge_items)))
             i = len(data) - 1
@@ -122,7 +122,7 @@ class TSDB(object):
             inserted = 0
             while i >= 0:
                 last_merge_item = merge_items[m]
-                if data[i][0] >= last_merge_item.min_ts:
+                if data[i][0] >= last_merge_item.ts_min:
                     inserted += last_merge_item.insert_point(data[i][0],
                                                              data[i][1])
                     i -= 1

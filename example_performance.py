@@ -5,22 +5,21 @@ import time
 import random
 from pytsdb import TSDB
 
-PATCH_SIZES = [3, 5, 10, 50, 100]
+PATCH_SIZES = [3]
 DATA_POINTS = 10000
 TIME_OFFSET = int(time.time() - 365*24*60*60)
 
 
-db = TSDB(storage="cassandra", BUCKET_DYNAMIC_TARGET=10,
-          BUCKET_DYNAMIC_MAX=15)
+db = TSDB(storage="cassandra")
 
 
 def insertTest(points, patch):
     i = 0
     t = time.time()
     while i < points:
-        d = [(TIME_OFFSET+i+x, float(random.randint(20,25)))
+        d = [(TIME_OFFSET+(i+x)*600, float(random.randint(20,25)))
              for x in range(patch)]
-        key = "test_{}".format(patch)
+        key = "testm_{}".format(patch)
         db._insert(key, d)
         i += patch
     return time.time() - t

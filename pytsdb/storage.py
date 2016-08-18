@@ -44,6 +44,24 @@ class Storage(object):
     def left(self, key, range_key):
         return self._to_item(key, self._left(key, range_key))
 
+    def stats(self, key):
+        return {"ts_min": self.ts_min(key), "ts_max": self.ts_max(key),
+                "count": self.count(key)}
+
+    def ts_min(self, key):
+        i = self.first(key)
+        return i.ts_min
+
+    def ts_max(self, key):
+        i = self.last(key)
+        return i.ts_max
+
+    def count(self, key):
+        items = self.query(key, 0, (2**31)-1)
+        count = 0
+        for i in items:
+            count += i.count
+        return count
 
 class CassandraStorage(Storage):
     def __init__(self, **kwargs):
@@ -72,6 +90,14 @@ class CassandraStorage(Storage):
             data blob,
             PRIMARY KEY (key, range_key)
             )""".format(self.table_name)
+        self.cassandra.execute(s)
+
+    def _dropTable(self):
+        k = """
+            DROP KEYSPACE IF EXISTS {};""".format(self.key_space)
+        self.cassandra.execute(k)
+        s = """
+            DROP TABLE IF EXISTS {};""".format(self.table_name)
         self.cassandra.execute(s)
 
     def _to_item(self, key, data):
@@ -177,6 +203,13 @@ class SQLiteStorage(Storage):
         c.execute(s)
         self.conn.commit()
 
+    def _dropTable(self):
+        c = self.conn.cursor()
+        s = """
+            DROP TABLE IF EXISTS {};""".format(self.table_name)
+        c.execute(s)
+        self.conn.commit()
+
     def _to_item(self, key, data):
         return Item.from_db_data(key, data)
 
@@ -193,6 +226,7 @@ class SQLiteStorage(Storage):
         data = buffer(data)
         c = self.conn.cursor()
         c.execute(s, (key, range_key, data))
+        self.conn.commit()
 
     def _get(self, key, range_key):
         s = """

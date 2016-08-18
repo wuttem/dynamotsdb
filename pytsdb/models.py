@@ -206,16 +206,20 @@ class Item(object):
             self.key, l, m, self.item_type, self.bucket_type)
 
     @property
-    def max_ts(self):
+    def ts_max(self):
         if len(self._timestamps) > 0:
             return self._timestamps[-1]
         return -1
 
     @property
-    def min_ts(self):
+    def ts_min(self):
         if len(self._timestamps) > 0:
             return self._timestamps[0]
         return -1
+
+    @property
+    def count(self):
+        return len(self._timestamps)
 
     def split_needed(self, limit="soft"):
         if len(self) > Item.DYNAMICSIZE_MAX:

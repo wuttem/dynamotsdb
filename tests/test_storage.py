@@ -8,6 +8,7 @@ import os
 
 from pytsdb.models import Item
 from pytsdb.storage import MemoryStorage, RedisStorage, CassandraStorage, SQLiteStorage
+from pytsdb.errors import NotFoundError
 
 
 class StorageTest(unittest.TestCase):
@@ -27,8 +28,16 @@ class StorageTest(unittest.TestCase):
 
     def test_sqlitestore(self):
         storage = SQLiteStorage("test.db3")
+        storage._dropTable()
         storage._createTable()
         self.assertTrue(storage)
+
+        with self.assertRaises(NotFoundError):
+            storage.get(key="test.ph", range_key=1000)
+        
+        with self.assertRaises(NotFoundError):
+            storage.last(key="test.ph")
+
         i = Item.new("test.ph", [(1000, 1.0)])
         storage.insert(i)
         i = Item.new("test.ph", [(2000, 4.0)])
@@ -90,13 +99,26 @@ class StorageTest(unittest.TestCase):
 
         d = storage.left(key="test.ph", range_key=1050)
         self.assertEqual(d[0], (1000, 1.0))
+
+        s = storage.stats(key="test.ph")
+        self.assertEqual(s["ts_min"], 1000)
+        self.assertEqual(s["ts_max"], 2000)
+        self.assertEqual(s["count"], 4)
 
     def test_cassandrastore(self):
         cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
         cassandra_port = os.getenv('CASSANDRA_PORT', 9042)
         storage = CassandraStorage(contact_points=[cassandra_host], port=cassandra_port)
+        storage._dropTable()
         storage._createTable()
         self.assertTrue(storage)
+
+        with self.assertRaises(NotFoundError):
+            storage.get(key="test.ph", range_key=1000)
+        
+        with self.assertRaises(NotFoundError):
+            storage.last(key="test.ph")
+
         i = Item.new("test.ph", [(1000, 1.0)])
         storage.insert(i)
         i = Item.new("test.ph", [(2000, 4.0)])
@@ -158,12 +180,24 @@ class StorageTest(unittest.TestCase):
 
         d = storage.left(key="test.ph", range_key=1050)
         self.assertEqual(d[0], (1000, 1.0))
+
+        s = storage.stats(key="test.ph")
+        self.assertEqual(s["ts_min"], 1000)
+        self.assertEqual(s["ts_max"], 2000)
+        self.assertEqual(s["count"], 4)
 
     def test_redisstore(self):
         redis_host = os.getenv('REDIS_HOST', 'localhost')
         redis_port = os.getenv('REDIS_PORT', 6379)
         storage = RedisStorage(host=redis_host, port=redis_port, db=0, expire=5)
         self.assertTrue(storage)
+
+        with self.assertRaises(NotFoundError):
+            storage.get(key="test.ph", range_key=1000)
+        
+        with self.assertRaises(NotFoundError):
+            storage.last(key="test.ph")
+
         i = Item.new("test.ph", [(1000, 1.0)])
         storage.insert(i)
         i = Item.new("test.ph", [(2000, 4.0)])
@@ -225,10 +259,22 @@ class StorageTest(unittest.TestCase):
 
         d = storage.left(key="test.ph", range_key=1050)
         self.assertEqual(d[0], (1000, 1.0))
+
+        s = storage.stats(key="test.ph")
+        self.assertEqual(s["ts_min"], 1000)
+        self.assertEqual(s["ts_max"], 2000)
+        self.assertEqual(s["count"], 4)
 
     def test_memorystore(self):
         storage = MemoryStorage()
         self.assertTrue(storage)
+
+        with self.assertRaises(NotFoundError):
+            storage.get(key="test.ph", range_key=1000)
+        
+        with self.assertRaises(NotFoundError):
+            storage.last(key="test.ph")
+
         i = Item.new("test.ph", [(1000, 1.0)])
         storage.insert(i)
         i = Item.new("test.ph", [(2000, 4.0)])
@@ -290,3 +336,8 @@ class StorageTest(unittest.TestCase):
 
         d = storage.left(key="test.ph", range_key=1050)
         self.assertEqual(d[0], (1000, 1.0))
+
+        s = storage.stats(key="test.ph")
+        self.assertEqual(s["ts_min"], 1000)
+        self.assertEqual(s["ts_max"], 2000)
+        self.assertEqual(s["count"], 4)
