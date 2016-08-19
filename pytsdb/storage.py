@@ -278,7 +278,14 @@ class SQLiteStorage(Storage):
         return res[0][2]
 
     def _update(self, key, range_key, data):
-        self._insert(key, range_key, data)
+        s = """
+            UPDATE {} SET data = ?
+            WHERE key = ? AND range_key = ?;
+            """.format(self.table_name)
+        data = buffer(data)
+        c = self.conn.cursor()
+        c.execute(s, (data, key, range_key))
+        self.conn.commit()
 
     def _query(self, key, range_min, range_max):
         s = """

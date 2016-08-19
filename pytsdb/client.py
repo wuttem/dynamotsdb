@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import re
 import logging
 
-from .storage import MemoryStorage, RedisStorage, CassandraStorage
+from .storage import MemoryStorage, RedisStorage, CassandraStorage, SQLiteStorage
 from .events import RedisPubSub
 from .models import Item, ResultSet, BucketType
 from .errors import NotFoundError
@@ -22,6 +22,7 @@ class TSDB(object):
             "REDIS_PORT": 6379,
             "REDIS_HOST": "localhost",
             "REDIS_DB": 0,
+            "SQLITE_FILE": "pytsdb.db3",
             "CASSANDRA_PORT": 9042,
             "CASSANDRA_HOST": "localhost"
         }
@@ -35,6 +36,8 @@ class TSDB(object):
         # Setup Storage
         if storage == "memory":
             self.storage = MemoryStorage()
+        elif storage == "sqlite":
+            self.storage = SQLiteStorage(self.settings["SQLITE_FILE"])
         elif storage == "redis":
             self.storage = RedisStorage(
                 host=self.settings["REDIS_HOST"],
