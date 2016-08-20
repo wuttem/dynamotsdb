@@ -86,7 +86,7 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(i2[0][0], 60*60)
         self.assertEqual(i2[9][0], 69*60)
 
-    def test_hourly(self):
+    def test_daily(self):
         d = TSDB(BUCKET_TYPE="daily")
         for i in range(0, 50):
             d._insert("sdsd", [(i * 60 * 30, 1.1)])
