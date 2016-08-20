@@ -123,6 +123,9 @@ class ModelTest(unittest.TestCase):
         i4 = Item("test1", [(1, 1.0)])
         self.assertEqual(i2, i4)
 
+        self.assertEqual(i2.to_hash(), i4.to_hash())
+        self.assertIn("test1", i2.pretty_print())
+
     def test_tuplearray(self):
         t = TupleArray("f", 2)
         self.assertEqual(len(t), 0)

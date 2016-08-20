@@ -72,9 +72,9 @@ class StorageTest(unittest.TestCase):
     def test_hourly(self):
         d = TSDB(BUCKET_TYPE="hourly")
         for i in range(0, 70):
-            d._insert("hi", [(i * 60, 1.1)])
+            d._insert("his", [(i * 60, 1.1)])
 
-        buckets = d.storage.query("hi", 0, 70*60)
+        buckets = d.storage.query("his", 0, 70*60)
         self.assertEqual(len(buckets), 2)
         i = buckets[0]
         self.assertEqual(len(i), 60)
@@ -85,6 +85,23 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(len(i2), 10)
         self.assertEqual(i2[0][0], 60*60)
         self.assertEqual(i2[9][0], 69*60)
+
+    def test_hourly(self):
+        d = TSDB(BUCKET_TYPE="daily")
+        for i in range(0, 50):
+            d._insert("sdsd", [(i * 60 * 30, 1.1)])
+
+        buckets = d.storage.query("sdsd", 0, 50 * 60 * 30)
+        self.assertEqual(len(buckets), 2)
+        i = buckets[0]
+        self.assertEqual(len(i), 48)
+        self.assertEqual(i[0][0], 0)
+        self.assertEqual(i[47][0], 47*60*30)
+
+        i2 = buckets[1]
+        self.assertEqual(len(i2), 2)
+        self.assertEqual(i2[0][0], 48 * 30 * 60)
+        self.assertEqual(i2[1][0], 49 * 30 * 60)
 
     def test_largedataset(self):
         # Generate
