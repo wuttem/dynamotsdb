@@ -103,11 +103,11 @@ class ModelTest(unittest.TestCase):
     def test_item(self):
         i1 = Item("test", item_type=ItemType.tuple_float_3)
         self.assertFalse(i1)
-        self.assertFalse(i1._dirty)
+        self.assertFalse(i1.dirty)
         self.assertFalse(i1.existing)
         i1.insert_point(1, (1.0, 2.0, 3.0))
         self.assertTrue(i1)
-        self.assertTrue(i1._dirty)
+        self.assertTrue(i1.dirty)
 
         i2 = Item("test1", [(1, 1.0)])
         self.assertEqual(i2[0], (1, 1.0))
@@ -115,6 +115,7 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(i2[0], (1, 1.0))
         i2.insert_point(1, 2.0, overwrite=True)
         self.assertEqual(i2[0], (1, 2.0))
+        i2.reset_dirty()
 
         i3 = Item("test2", [(1, 1.0)])
         self.assertNotEqual(i2, i3)

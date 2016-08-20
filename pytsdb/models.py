@@ -15,9 +15,12 @@ import bisect
 import logging
 import struct
 import array
+import hashlib
 
 from .helper import ts_daily_left, ts_daily_right
 from .helper import ts_hourly_left, ts_hourly_right
+from .helper import ts_weekly_left, ts_weekly_right
+from .helper import ts_monthly_left, ts_monthly_right
 
 
 Aggregation = namedtuple('Aggregation', ['min', 'max', 'sum', 'count'])
@@ -146,11 +149,21 @@ class Item(object):
     def dirty(self):
         return self._dirty
 
+    def reset_dirty(self):
+        self._dirty = False
+
     @property
     def range_key(self):
-        if len(self._timestamps) > 0:
+        if len(self._timestamps) < 1:
+            raise ValueError("empty series")
+        if self.bucket_type == BucketType.dynamic:
             return self._timestamps[0]
-        raise ValueError("empty series")
+        elif self.bucket_type == BucketType.hourly:
+            return ts_hourly_left(self._timestamps[0])
+        elif self.bucket_type == BucketType.daily:
+            return ts_daily_left(self._timestamps[0])
+        else:
+            raise NotImplementedError()
 
     def __len__(self):
         return len(self._timestamps)
@@ -175,10 +188,24 @@ class Item(object):
         it.next()
         return all(b >= a for a, b in zip(self._timestamps, it))
 
+    def to_hash(self):
+        s = "{}.{}.{}.{}.{}.{}.{}.{}".format(self.key, self.item_type,
+                                             self.bucket_type, len(self), 
+                                             self.ts_min, self.ts_max, 
+                                             self.existing, self.dirty)
+        return hashlib.sha1(s).hexdigest()
+
     def __eq__(self, other):
         if not isinstance(other, Item):
             return False
+        # Is Hashing a Performance Problem ?
+        # h1 = self.to_hash()
+        # h2 = other.to_hash()
+        # return h1 == h2
+        # This would compare the objects without hash
         if self.key != other.key:
+            return False
+        if self._dirty != other._dirty:
             return False
         if self.item_type != other.item_type:
             return False
@@ -222,11 +249,24 @@ class Item(object):
         return len(self._timestamps)
 
     def split_needed(self, limit="soft"):
-        if len(self) > Item.DYNAMICSIZE_MAX:
-            return True
-        if len(self) > Item.DYNAMICSIZE_TARGET and limit == "soft":
-            return True
-        return False
+        if len(self) < 1:
+            return False
+        if self.bucket_type == BucketType.dynamic:
+            if len(self) > Item.DYNAMICSIZE_MAX:
+                return True
+            if len(self) > Item.DYNAMICSIZE_TARGET and limit == "soft":
+                return True
+            return False
+        elif self.bucket_type == BucketType.hourly:
+            l = ts_hourly_left(self.ts_min)
+            r = ts_hourly_left(self.ts_max)
+            return not (l == r)
+        elif self.bucket_type == BucketType.daily:
+            l = ts_daily_left(self.ts_min)
+            r = ts_daily_left(self.ts_max)
+            return not (l == r)
+        else:
+            raise NotImplementedError()
 
     def _at(self, i):
         if self.item_type == ItemType.basic_aggregation:
@@ -250,7 +290,43 @@ class Item(object):
                 self._values.tostring())
 
     def split_item(self):
-        return self._split_item(count=Item.DYNAMICSIZE_TARGET)
+        if self.bucket_type == BucketType.dynamic:
+            return self._split_item(count=Item.DYNAMICSIZE_TARGET)
+        return self._split_item_at(bucket_type=self.bucket_type)
+
+    def _split_item_at(self, bucket_type):
+        if bucket_type == BucketType.hourly:
+            l = ts_hourly_left
+            r = ts_hourly_right
+        elif bucket_type == BucketType.daily:
+            l = ts_daily_left
+            r = ts_daily_right
+        else:
+            raise NotImplementedError()
+
+        new_items = []
+        new_items.append(self)
+        last_bucket = l(self._timestamps[0])
+        i = 0
+        while i < len(new_items[-1]._timestamps):
+            current_bucket = l(new_items[-1]._timestamps[i])
+            if current_bucket == last_bucket:
+                # No Split here
+                i += 1
+            else:
+                # Split it
+                new_item = Item(self.key, item_type=self.item_type,
+                                bucket_type=self.bucket_type)
+                new_item._dirty = True
+                new_item._timestamps = new_items[-1]._timestamps[i:]
+                new_item._values = new_items[-1]._values[i:]
+                new_items[-1]._timestamps = new_items[-1]._timestamps[:i]
+                new_items[-1]._values = new_items[-1]._values[:i]
+                new_items.append(new_item)
+                last_bucket = current_bucket
+                i = 0
+        new_items[0]._dirty = True
+        return new_items
 
     def _split_item(self, count):
         if count >= len(self._timestamps):
@@ -310,7 +386,7 @@ class Item(object):
                 self._dirty = True
                 return 1
             return 0
-        # Normal Insert
+        # Insert
         self._timestamps.insert(idx, timestamp)
         self._values.insert(idx, value)
         self._dirty = True

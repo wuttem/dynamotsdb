@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class TSDB(object):
     def __init__(self, storage="memory", **kwargs):
         self.settings = {
-            "BUCKET_TYPE": "daily",
+            "BUCKET_TYPE": "dynamic",
             "BUCKET_DYNAMIC_TARGET": 100,
             "BUCKET_DYNAMIC_MAX": 200,
             "REDIS_PORT": 6379,
@@ -161,13 +161,13 @@ class TSDB(object):
 
             # Update Event
             self.events.publish_event(key=key,
-                                    ts_min=stats["ts_min"],
-                                    ts_max=stats["ts_max"],
-                                    count=stats["count"],
-                                    appended=stats["appended"],
-                                    inserted=stats["inserted"],
-                                    updated=stats["updated"],
-                                    deleted=0)
+                                      ts_min=stats["ts_min"],
+                                      ts_max=stats["ts_max"],
+                                      count=stats["count"],
+                                      appended=stats["appended"],
+                                      inserted=stats["inserted"],
+                                      updated=stats["updated"],
+                                      deleted=0)
             logger.debug("Insert Finished {}".format(stats))
         else:
             logger.info("Duplicate ... Nothing to do ...")
