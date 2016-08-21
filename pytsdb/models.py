@@ -162,8 +162,11 @@ class Item(object):
             return ts_hourly_left(self._timestamps[0])
         elif self.bucket_type == BucketType.daily:
             return ts_daily_left(self._timestamps[0])
-        else:
-            raise NotImplementedError()
+        elif self.bucket_type == BucketType.weekly:
+            return ts_weekly_left(self._timestamps[0])
+        elif self.bucket_type == BucketType.monthly:
+            return ts_monthly_left(self._timestamps[0])
+        raise NotImplementedError()
 
     def __len__(self):
         return len(self._timestamps)
@@ -265,8 +268,15 @@ class Item(object):
             l = ts_daily_left(self.ts_min)
             r = ts_daily_left(self.ts_max)
             return not (l == r)
-        else:
-            raise NotImplementedError()
+        elif self.bucket_type == BucketType.weekly:
+            l = ts_weekly_left(self.ts_min)
+            r = ts_weekly_left(self.ts_max)
+            return not (l == r)
+        elif self.bucket_type == BucketType.monthly:
+            l = ts_monthly_left(self.ts_min)
+            r = ts_monthly_left(self.ts_max)
+            return not (l == r)
+        raise NotImplementedError()
 
     def _at(self, i):
         if self.item_type == ItemType.basic_aggregation:
@@ -291,16 +301,22 @@ class Item(object):
 
     def split_item(self):
         if self.bucket_type == BucketType.dynamic:
-            return self._split_item(count=Item.DYNAMICSIZE_TARGET)
-        return self._split_item_at(bucket_type=self.bucket_type)
+            return self._split_item_at(count=Item.DYNAMICSIZE_TARGET)
+        return self._split_item()
 
-    def _split_item_at(self, bucket_type):
-        if bucket_type == BucketType.hourly:
+    def _split_item(self):
+        if self.bucket_type == BucketType.hourly:
             l = ts_hourly_left
             r = ts_hourly_right
-        elif bucket_type == BucketType.daily:
+        elif self.bucket_type == BucketType.daily:
             l = ts_daily_left
             r = ts_daily_right
+        elif self.bucket_type == BucketType.weekly:
+            l = ts_weekly_left
+            r = ts_weekly_right
+        elif self.bucket_type == BucketType.monthly:
+            l = ts_monthly_left
+            r = ts_monthly_right
         else:
             raise NotImplementedError()
 
@@ -328,7 +344,7 @@ class Item(object):
         new_items[0]._dirty = True
         return new_items
 
-    def _split_item(self, count):
+    def _split_item_at(self, count):
         if count >= len(self._timestamps):
             raise ValueError("split to big")
         splits = list(range(count, len(self._timestamps), count))

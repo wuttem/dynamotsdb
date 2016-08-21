@@ -156,7 +156,7 @@ class ModelTest(unittest.TestCase):
         i = Item("ph")
         i.insert(d)
         self.assertEqual(len(i), 100)
-        buckets = i._split_item(30)
+        buckets = i._split_item_at(30)
         self.assertEqual(len(buckets), 4)
         self.assertEqual(len(buckets[0]), 30)
         self.assertEqual(len(buckets[1]), 30)

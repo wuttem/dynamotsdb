@@ -6,14 +6,14 @@ import logging
 import os
 
 
-from pytsdb.models import Item
+from pytsdb.models import Item, BucketType
 from pytsdb.storage import MemoryStorage, RedisStorage, CassandraStorage, SQLiteStorage
 from pytsdb.errors import NotFoundError
 
 
 class StorageTest(unittest.TestCase):
     def setUp(self):
-        pass
+        Item.DEFAULT_BUCKETTYPE = BucketType.dynamic
 
     def tearDown(self):
         pass

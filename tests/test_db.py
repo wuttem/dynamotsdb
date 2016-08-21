@@ -9,7 +9,7 @@ import logging
 from pytsdb import TSDB
 
 
-class StorageTest(unittest.TestCase):
+class DatabaseTest(unittest.TestCase):
     def setUp(self):
         pass
 
@@ -102,6 +102,23 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(len(i2), 2)
         self.assertEqual(i2[0][0], 48 * 30 * 60)
         self.assertEqual(i2[1][0], 49 * 30 * 60)
+
+    def test_weekly(self):
+        d = TSDB(BUCKET_TYPE="weekly")
+        for i in range(0, 20):
+            d._insert("sdsd", [(i * 24 * 60 * 60, 1.1)])
+
+        buckets = d.storage.query("sdsd", 0, 20 * 24 * 60 * 60)
+        self.assertEqual(len(buckets), 4)
+        i = buckets[0]
+        self.assertEqual(len(i), 4)
+        self.assertEqual(i[0][0], 0)
+        self.assertEqual(i[3][0], 3 * 24 * 60 * 60)
+
+        i2 = buckets[1]
+        self.assertEqual(len(i2), 7)
+        self.assertEqual(i2[0][0], 4 * 24 * 60 * 60)
+        self.assertEqual(i2[6][0], 10 * 24 * 60 * 60)
 
     def test_largedataset(self):
         # Generate
