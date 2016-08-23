@@ -4,6 +4,7 @@
 import unittest
 import random
 import logging
+import os
 
 
 from pytsdb import TSDB
@@ -23,6 +24,59 @@ class DatabaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
+
+    def test_cassandra_rewrite(self):
+        cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
+        cassandra_port = os.getenv('CASSANDRA_PORT', 9042)
+        db = TSDB(STORAGE="cassandra",
+                  BUCKET_TYPE="daily",
+                  CASSANDRA_HOST=cassandra_host,
+                  CASSANDRA_PORT=cassandra_port)
+        db.storage._dropTable()
+        db.storage._createTable()
+        for i in range(0, 300):
+            db._insert("cass", [(i * 10 * 60, 1.1)])
+
+        res = db.storage.query("cass", 0, 4 * 24 * 60 * 60)
+        self.assertEqual(len(res), 3)
+        self.assertEqual(len(res[0]), 144)
+        self.assertEqual(len(res[1]), 144)
+        self.assertEqual(len(res[2]), 12)
+
+        res = db._query("cass", 0, 4 * 24 * 60 * 60)
+        self.assertEqual(len(res), 300)
+        self.assertEqual(res[144][0], 24 * 60 * 60)
+        self.assertAlmostEqual(res[144][1], 1.1, 4)
+
+        for i in range(0, 300):
+            db._insert("cass", [(i * 10 * 60, 2.2)])
+
+        res = db.storage.query("cass", 0, 4 * 24 * 60 * 60)
+        self.assertEqual(len(res), 3)
+        self.assertEqual(len(res[0]), 144)
+        self.assertEqual(len(res[1]), 144)
+        self.assertEqual(len(res[2]), 12)
+
+        res = db._query("cass", 0, 4 * 24 * 60 * 60)
+        self.assertEqual(len(res), 300)
+        self.assertEqual(res[144][0], 24 * 60 * 60)
+        self.assertAlmostEqual(res[144][1], 1.1, 4)
+
+        for i in range(0, 300):
+            db._insert("cass", [(i * 10 * 60 + 1, 2.2)])
+
+        res = db.storage.query("cass", 0, 4 * 24 * 60 * 60 + 1)
+        self.assertEqual(len(res), 3)
+        self.assertEqual(len(res[0]), 288)
+        self.assertEqual(len(res[1]), 288)
+        self.assertEqual(len(res[2]), 24)
+
+        res = db._query("cass", 0, 4 * 24 * 60 * 60 + 1)
+        self.assertEqual(len(res), 600)
+        self.assertEqual(res[288][0], 24 * 60 * 60)
+        self.assertAlmostEqual(res[288][1], 1.1, 4)
+        self.assertEqual(res[289][0], 24 * 60 * 60 + 1)
+        self.assertAlmostEqual(res[289][1], 2.2, 4)
 
     def test_invalidmetricname(self):
         with self.assertRaises(ValueError):
@@ -89,9 +143,9 @@ class DatabaseTest(unittest.TestCase):
     def test_daily(self):
         d = TSDB(BUCKET_TYPE="daily")
         for i in range(0, 50):
-            d._insert("sdsd", [(i * 60 * 30, 1.1)])
+            d._insert("daily", [(i * 60 * 30, 1.1)])
 
-        buckets = d.storage.query("sdsd", 0, 50 * 60 * 30)
+        buckets = d.storage.query("daily", 0, 50 * 60 * 30)
         self.assertEqual(len(buckets), 2)
         i = buckets[0]
         self.assertEqual(len(i), 48)
@@ -106,9 +160,9 @@ class DatabaseTest(unittest.TestCase):
     def test_weekly(self):
         d = TSDB(BUCKET_TYPE="weekly")
         for i in range(0, 20):
-            d._insert("sdsd", [(i * 24 * 60 * 60, 1.1)])
+            d._insert("weekly", [(i * 24 * 60 * 60, 1.1)])
 
-        buckets = d.storage.query("sdsd", 0, 20 * 24 * 60 * 60)
+        buckets = d.storage.query("weekly", 0, 20 * 24 * 60 * 60)
         self.assertEqual(len(buckets), 4)
         i = buckets[0]
         self.assertEqual(len(i), 4)
@@ -119,6 +173,23 @@ class DatabaseTest(unittest.TestCase):
         self.assertEqual(len(i2), 7)
         self.assertEqual(i2[0][0], 4 * 24 * 60 * 60)
         self.assertEqual(i2[6][0], 10 * 24 * 60 * 60)
+
+    def test_monthly(self):
+        d = TSDB(BUCKET_TYPE="monthly")
+        for i in range(0, 40):
+            d._insert("monthly", [(i * 24 * 60 * 60, 1.1)])
+
+        buckets = d.storage.query("monthly", 0, 40 * 24 * 60 * 60)
+        self.assertEqual(len(buckets), 2)
+        i = buckets[0]
+        self.assertEqual(len(i), 31)
+        self.assertEqual(i[0][0], 0)
+        self.assertEqual(i[30][0], 30 * 24 * 60 * 60)
+
+        i2 = buckets[1]
+        self.assertEqual(len(i2), 9)
+        self.assertEqual(i2[0][0], 31 * 24 * 60 * 60)
+        self.assertEqual(i2[8][0], 39 * 24 * 60 * 60)
 
     def test_largedataset(self):
         # Generate
@@ -150,13 +221,13 @@ class DatabaseTest(unittest.TestCase):
         # Insert
         d = TSDB(BUCKET_TYPE="dynamic", BUCKET_DYNAMIC_TARGET=100)
         for p in s:
-            d._insert("ph", p)
+            d._insert("large", p)
 
-        buckets = d.storage.query("ph", 0, 50000)
+        buckets = d.storage.query("large", 0, 50000)
         self.assertGreater(len(buckets), 450)
         self.assertLess(len(buckets), 550)
 
-        res = d._query("ph", 1, 50000)
+        res = d._query("large", 1, 50000)
         self.assertEqual(len(res), 49999)
-        res = d._query("ph", 0, 49999)
+        res = d._query("large", 0, 49999)
         self.assertEqual(len(res), 50000)

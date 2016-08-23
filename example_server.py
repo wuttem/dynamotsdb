@@ -5,7 +5,7 @@ import time
 import random
 from pytsdb import TSDB
 
-db = TSDB(storage="cassandra")
+db = TSDB(STORAGE="cassandra")
 
 try:
     while True:

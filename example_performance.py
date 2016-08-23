@@ -3,15 +3,17 @@
 
 import time
 import random
+import logging
 import itertools
 from pytsdb import TSDB
 
-PATCH_SIZES = [3, 5, 10, 30, 50]
-DATA_POINTS = 10000
+PATCH_SIZES = [3, 10, 30, 50]
+DATA_POINTS = 100
 TIME_OFFSET = int(time.time() - 365*24*60*60)
+TIME_OFFSET = TIME_OFFSET - (TIME_OFFSET % (24 * 60 * 60))
 
 
-db = TSDB(storage="cassandra", BUCKET_TYPE="daily")
+db = TSDB(STORAGE="cassandra", BUCKET_TYPE="daily")
 
 
 def insertTest(points, patch, sensor="sensor0"):
@@ -27,11 +29,14 @@ def insertTest(points, patch, sensor="sensor0"):
 
 if __name__ == '__main__':
     db.storage._createTable()
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info("Starting Test Script With TS: {}".format(TIME_OFFSET))
 
     for patch in PATCH_SIZES:
         print("Testing Patch: {}".format(patch))
         t = time.time()
-        res = insertTest(DATA_POINTS, patch, "sensor0")
+        res = insertTest(DATA_POINTS, patch, "test0")
         print(res)
         t = time.time() - t
         p_s = DATA_POINTS / t

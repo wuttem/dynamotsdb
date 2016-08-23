@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class TSDB(object):
-    def __init__(self, storage="memory", **kwargs):
+    def __init__(self, STORAGE="memory", **kwargs):
         self.settings = {
             "BUCKET_TYPE": "dynamic",
             "BUCKET_DYNAMIC_TARGET": 100,
@@ -24,7 +24,9 @@ class TSDB(object):
             "REDIS_DB": 0,
             "SQLITE_FILE": "pytsdb.db3",
             "CASSANDRA_PORT": 9042,
-            "CASSANDRA_HOST": "localhost"
+            "CASSANDRA_HOST": "localhost",
+            "ENABLE_CACHING": True,
+            "ENABLE_EVENTS": True
         }
         self.settings.update(kwargs)
 
@@ -34,28 +36,43 @@ class TSDB(object):
         Item.DEFAULT_BUCKETTYPE = BucketType[self.settings["BUCKET_TYPE"]]
 
         # Setup Storage
-        if storage == "memory":
+        if STORAGE == "memory":
             self.storage = MemoryStorage()
-        elif storage == "sqlite":
+        elif STORAGE == "sqlite":
             self.storage = SQLiteStorage(self.settings["SQLITE_FILE"])
-        elif storage == "redis":
+        elif STORAGE == "redis":
             self.storage = RedisStorage(
                 host=self.settings["REDIS_HOST"],
                 port=self.settings["REDIS_PORT"],
                 db=self.settings["REDIS_DB"])
-        elif storage == "cassandra":
+        elif STORAGE == "cassandra":
             self.storage = CassandraStorage(
                 contact_points=[self.settings["CASSANDRA_HOST"]],
                 port=self.settings["CASSANDRA_PORT"])
         else:
             raise NotImplementedError("Storage not implemented")
 
-        self.events = RedisPubSub(host=self.settings["REDIS_HOST"],
-                                  port=self.settings["REDIS_PORT"],
-                                  db=self.settings["REDIS_DB"])
+        # Event Class
+        if self.settings["ENABLE_EVENTS"]:
+            self.events = RedisPubSub(host=self.settings["REDIS_HOST"],
+                                      port=self.settings["REDIS_PORT"],
+                                      db=self.settings["REDIS_DB"])
 
     def _register_data_listener(self, key, callback):
+        if not self.settings["ENABLE_EVENTS"]:
+            raise RuntimeError("Events not enabled")
         self.events.register_callback(key, callback)
+
+    def _event(self, key, stats):
+        if self.settings["ENABLE_EVENTS"]:
+            self.events.publish_event(key=key,
+                                      ts_min=stats["ts_min"],
+                                      ts_max=stats["ts_max"],
+                                      count=stats["count"],
+                                      appended=stats["appended"],
+                                      inserted=stats["inserted"],
+                                      updated=stats["updated"],
+                                      deleted=0)
 
     def _close(self):
         self.events.close()
@@ -117,6 +134,7 @@ class TSDB(object):
             # Merge Round
             merge_items = self._get_items_between(key, ts_min, ts_max)
             assert(len(merge_items) > 0)
+            logging.error("{} <= {}".format(merge_items[0].ts_min, ts_min))
             assert(merge_items[0].ts_min <= ts_min)
             logger.debug("Merging Data Query({} - {}) {} items"
                          .format(ts_min, ts_max, len(merge_items)))
@@ -160,14 +178,7 @@ class TSDB(object):
                 self._insert_or_update_item(i)
 
             # Update Event
-            self.events.publish_event(key=key,
-                                      ts_min=stats["ts_min"],
-                                      ts_max=stats["ts_max"],
-                                      count=stats["count"],
-                                      appended=stats["appended"],
-                                      inserted=stats["inserted"],
-                                      updated=stats["updated"],
-                                      deleted=0)
+            self._event(key=key, stats=stats)
             logger.debug("Insert Finished {}".format(stats))
         else:
             logger.info("Duplicate ... Nothing to do ...")

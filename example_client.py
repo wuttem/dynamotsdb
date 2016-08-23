@@ -6,7 +6,7 @@ import random
 from pytsdb import TSDB
 
 
-db = TSDB(storage="cassandra")
+db = TSDB(STORAGE="cassandra")
 
 def onData(key, event):
     print("New: {}".format(event))
