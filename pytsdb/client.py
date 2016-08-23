@@ -3,10 +3,12 @@
 from __future__ import unicode_literals
 import re
 import logging
+import redis
 
 from .storage import MemoryStorage, RedisStorage, CassandraStorage, SQLiteStorage
 from .events import RedisPubSub
 from .models import Item, ResultSet, BucketType
+from .cache import RedisLRU
 from .errors import NotFoundError
 
 
@@ -35,16 +37,18 @@ class TSDB(object):
         Item.DYNAMICSIZE_MAX = self.settings["BUCKET_DYNAMIC_MAX"]
         Item.DEFAULT_BUCKETTYPE = BucketType[self.settings["BUCKET_TYPE"]]
 
+        # Setup Redis Pool
+        self.redis_pool = redis.ConnectionPool(host=self.settings["REDIS_HOST"],
+                                               port=self.settings["REDIS_PORT"],
+                                               db=self.settings["REDIS_DB"])
+
         # Setup Storage
         if STORAGE == "memory":
             self.storage = MemoryStorage()
         elif STORAGE == "sqlite":
             self.storage = SQLiteStorage(self.settings["SQLITE_FILE"])
         elif STORAGE == "redis":
-            self.storage = RedisStorage(
-                host=self.settings["REDIS_HOST"],
-                port=self.settings["REDIS_PORT"],
-                db=self.settings["REDIS_DB"])
+            self.storage = RedisStorage(connection_pool=self.redis_pool)
         elif STORAGE == "cassandra":
             self.storage = CassandraStorage(
                 contact_points=[self.settings["CASSANDRA_HOST"]],
@@ -54,9 +58,12 @@ class TSDB(object):
 
         # Event Class
         if self.settings["ENABLE_EVENTS"]:
-            self.events = RedisPubSub(host=self.settings["REDIS_HOST"],
-                                      port=self.settings["REDIS_PORT"],
-                                      db=self.settings["REDIS_DB"])
+            self.events = RedisPubSub(connection_pool=self.redis_pool)
+
+        if self.settings["ENABLE_CACHING"]:
+            self.cache = RedisLRU(connection_pool=self.redis_pool)
+            self.cache.setup_namespace("last_item", 1000)
+            self.cache.clearAll()
 
     def _register_data_listener(self, key, callback):
         if not self.settings["ENABLE_EVENTS"]:
@@ -77,11 +84,37 @@ class TSDB(object):
     def _close(self):
         self.events.close()
 
+    def _last_item_from_cache(self, key):
+        # Cache Disbaled - Miss
+        if not self.settings["ENABLE_CACHING"]:
+            return None
+        item_data = self.cache.get(key=key, namespace="last_item")
+        if item_data is None:
+            logger.debug("GET MISS: {}".format(key))
+            return None
+        item = Item.from_db_data(key, item_data)
+        logger.debug("GET HIT: {}".format(item))
+        return item
+
+    def _store_last_item_in_cache(self, last_item):
+        if not self.settings["ENABLE_CACHING"]:
+            return
+        logger.debug("PUT: {}".format(last_item))
+        self.cache.store(last_item.key, last_item.to_string(),
+                         namespace="last_item")
+
     def _get_last_item_or_new(self, key):
+        # Try to get it from Cache
+        cached = self._last_item_from_cache(key)
+        if cached is not None:
+            return cached
+        # Get it from DB
         try:
             item = self.storage.last(key)
         except NotFoundError:
             item = Item.new(key)
+        else:
+            self._store_last_item_in_cache(item)
         return item
 
     def _get_items_between(self, key, ts_min, ts_max):
@@ -119,6 +152,10 @@ class TSDB(object):
 
         # Find the last Item
         last_item = self._get_last_item_or_new(key)
+        if len(last_item) > 0:
+            last_item_range_key = last_item.range_key
+        else:
+            last_item_range_key = -1
         logger.debug("Last: {}".format(last_item))
 
         # List with all Items we updated
@@ -134,7 +171,6 @@ class TSDB(object):
             # Merge Round
             merge_items = self._get_items_between(key, ts_min, ts_max)
             assert(len(merge_items) > 0)
-            logging.error("{} <= {}".format(merge_items[0].ts_min, ts_min))
             assert(merge_items[0].ts_min <= ts_min)
             logger.debug("Merging Data Query({} - {}) {} items"
                          .format(ts_min, ts_max, len(merge_items)))
@@ -180,6 +216,10 @@ class TSDB(object):
             # Update Event
             self._event(key=key, stats=stats)
             logger.debug("Insert Finished {}".format(stats))
+
+            # If it was the Last Item we update the Cache
+            if updated_splitted[-1].range_key >= last_item_range_key:
+                self._store_last_item_in_cache(updated_splitted[-1])
         else:
             logger.info("Duplicate ... Nothing to do ...")
 

@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 
 import logging
 import time
-import json
+#import json
 from redis import StrictRedis as Redis
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,13 @@ class RedisLRU(object):
         self.namespaces[namespace] = int(size)
 
     def _serialize(self, s):
-        return json.dumps(s)
+        # return json.dumps(s)
+        return s
 
     def _unserialize(self, s):
-        return json.loads(s)
+        # s = s.decode("utf-8")
+        # return json.loads(s)
+        return s
 
     def _size(self, namespace):
         return self.namespaces[namespace]
@@ -49,7 +52,6 @@ class RedisLRU(object):
         hits = self._hit_store(namespace)
         size = self._size(namespace)
         count = self._redis.zcard(hits)
-        logger.error("Expire {} >= {}".format(count, size))
         if count >= size:
             values = self._value_store(namespace)
             items = self._redis.zrange(hits, 0, count-size)
@@ -64,15 +66,24 @@ class RedisLRU(object):
         values = self._value_store(namespace)
         self._redis.delete(hits, values)
 
+    def clearAll(self):
+        """Clear all known namespaces.
+        """
+        for k in self.namespaces.iterkeys():
+            self.clear(k)
+
     def store(self, key, value, namespace="default"):
         """Store a key value pair in cache.
         This will not update an existing item.
         """
         values = self._value_store(namespace)
-        logger.error("store: {}".format(key))
         if not self._redis.hexists(values, key):
             hits = self._hit_store(namespace)
             self._expire_old(namespace)
+            self._redis.hset(values, key, self._serialize(value))
+            self._redis.zadd(hits, time.time(), key)
+        else:
+            hits = self._hit_store(namespace)
             self._redis.hset(values, key, self._serialize(value))
             self._redis.zadd(hits, time.time(), key)
 
@@ -85,7 +96,7 @@ class RedisLRU(object):
         if value:
             hits = self._hit_store(namespace)
             self._redis.zadd(hits, time.time(), key)
-            return self._unserialize(value.decode("utf-8"))
+            return self._unserialize(value)
         return None
 
     def expire(self, key, namespace="default"):
