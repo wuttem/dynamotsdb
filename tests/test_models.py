@@ -7,7 +7,7 @@ import logging
 import binascii
 import datetime
 
-from pytsdb.models import Item, ItemType, Aggregation, TupleArray
+from pytsdb.models import Item, ItemType, Aggregation, TupleArray, Stats
 from pytsdb.models import ResultSet
 from pytsdb.helper import to_ts
 
@@ -26,6 +26,19 @@ class ModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
+
+    def test_stats(self):
+        obj = Stats(key="test", ts_min=1, ts_max=3, count=2)
+        self.assertEqual(obj["ts_min"], obj.ts_min)
+        self.assertEqual(obj["ts_max"], obj.ts_max)
+        self.assertEqual(obj["count"], obj.count)
+        self.assertEqual(obj["key"], obj.key)
+        s = obj.to_string()
+        o = Stats.from_string(s)
+        self.assertEqual(o.ts_min, 1)
+        self.assertEqual(o.count, 2)
+        self.assertEqual(o.ts_max, 3)
+        self.assertEqual(o.key, "test")
 
     def test_aggregations(self):
         ts = to_ts(datetime.datetime(2000, 1, 1, 0, 0))

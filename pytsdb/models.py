@@ -16,6 +16,7 @@ import logging
 import struct
 import array
 import hashlib
+import json
 
 from .helper import ts_daily_left, ts_daily_right
 from .helper import ts_hourly_left, ts_hourly_right
@@ -42,6 +43,38 @@ class ItemType(Enum):
     tuple_float_3 = 4
     tuple_float_4 = 5
     basic_aggregation = 6
+
+
+class Stats(dict):
+    def __init__(self, key, ts_min, ts_max, count, *args, **kwargs):
+        super(Stats, self).__init__(*args, **kwargs)
+        self["key"] = key
+        self["ts_min"] = ts_min
+        self["ts_max"] = ts_max
+        self["count"] = count
+
+    @property
+    def ts_min(self):
+        return self["ts_min"]
+
+    @property
+    def ts_max(self):
+        return self["ts_max"]
+
+    @property
+    def count(self):
+        return self["count"]
+
+    @property
+    def key(self):
+        return self["key"]
+
+    def to_string(self):
+        return json.dumps(self)
+
+    @classmethod
+    def from_string(cls, s):
+        return cls(**json.loads(s))
 
 
 class TupleArray(MutableSequence):

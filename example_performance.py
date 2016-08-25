@@ -12,7 +12,7 @@ TIME_OFFSET = int(time.time() - 365*24*60*60)
 TIME_OFFSET = TIME_OFFSET - (TIME_OFFSET % (24 * 60 * 60))
 
 
-db = TSDB(STORAGE="cassandra", BUCKET_TYPE="daily")
+db = TSDB(STORAGE="cassandra", BUCKET_TYPE="daily", ENABLE_CACHING=True)
 
 
 def insertTest(points, patch, sensor="sensor0"):
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     for patch in PATCH_SIZES:
         print("Testing Patch: {}".format(patch))
         t = time.time()
-        res = insertTest(DATA_POINTS, patch, "test01")
+        res = insertTest(DATA_POINTS, patch, "test06")
         print(res)
         t = time.time() - t
         p_s = DATA_POINTS / t

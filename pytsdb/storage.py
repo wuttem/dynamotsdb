@@ -6,7 +6,7 @@ import bisect
 from redis import StrictRedis as Redis
 from collections import namedtuple
 from .errors import NotFoundError, ConflictError
-from .models import Item
+from .models import Item, Stats
 
 
 Element = namedtuple('Element', ['key', 'range_key', 'data'])
@@ -44,8 +44,8 @@ class Storage(object):
         return self._to_item(key, self._left(key, range_key))
 
     def stats(self, key):
-        return {"ts_min": self.ts_min(key), "ts_max": self.ts_max(key),
-                "count": self.count(key)}
+        return Stats(key=key, ts_min=self.ts_min(key), ts_max=self.ts_max(key),
+                     count=self.count(key))
 
     def ts_min(self, key):
         i = self.first(key)

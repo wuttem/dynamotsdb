@@ -7,7 +7,7 @@ import redis
 
 from .storage import MemoryStorage, RedisStorage, CassandraStorage, SQLiteStorage
 from .events import RedisPubSub
-from .models import Item, ResultSet, BucketType
+from .models import Item, ResultSet, BucketType, Stats
 from .cache import RedisLRU
 from .errors import NotFoundError
 
@@ -63,6 +63,7 @@ class TSDB(object):
         if self.settings["ENABLE_CACHING"]:
             self.cache = RedisLRU(connection_pool=self.redis_pool)
             self.cache.setup_namespace("last_item", 1000)
+            self.cache.setup_namespace("data_stats", 1000)
             self.cache.clearAll()
 
     def _register_data_listener(self, key, callback):
@@ -90,16 +91,16 @@ class TSDB(object):
             return None
         item_data = self.cache.get(key=key, namespace="last_item")
         if item_data is None:
-            logger.debug("GET MISS: {}".format(key))
+            logger.debug("LAST GET MISS: {}".format(key))
             return None
         item = Item.from_db_data(key, item_data)
-        logger.debug("GET HIT: {}".format(item))
+        logger.debug("LAST GET HIT: {}".format(item))
         return item
 
     def _store_last_item_in_cache(self, last_item):
         if not self.settings["ENABLE_CACHING"]:
             return
-        logger.debug("PUT: {}".format(last_item))
+        logger.debug("LAST PUT: {}".format(last_item))
         self.cache.store(last_item.key, last_item.to_string(),
                          namespace="last_item")
 
@@ -130,6 +131,32 @@ class TSDB(object):
             self.storage.update(item)
         else:
             self.storage.insert(item)
+
+    def _stats_from_cache(self, key):
+        if not self.settings["ENABLE_CACHING"]:
+            return None
+        stats_raw = self.cache.get(key=key, namespace="data_stats")
+        if stats_raw is None:
+            logger.debug("STATS GET MISS: {}".format(key))
+            return None
+        stats = Stats.from_string(stats_raw)
+        logger.debug("STATS GET HIT: {}".format(key))
+        return stats
+
+    def _stats(self, key):
+        # Try to get the Stats from Cache
+        cached = self._stats_from_cache(key)
+        if cached is not None:
+            return cached
+        # From DB
+        stats = self.storage.stats(key)
+        self.cache.store(key, stats.to_string(), namespace="data_stats")
+        return self.storage.stats(key)
+
+    def _data_changed(self, key):
+        if not self.settings["ENABLE_CACHING"]:
+            return
+        self.cache.expire(key, namespace="data_stats")
 
     def _insert(self, key, data):
         key = key.lower()
@@ -216,6 +243,9 @@ class TSDB(object):
             # Update Event
             self._event(key=key, stats=stats)
             logger.debug("Insert Finished {}".format(stats))
+
+            # Invalidate Stats
+            self._data_changed(key)
 
             # If it was the Last Item we update the Cache
             if updated_splitted[-1].range_key >= last_item_range_key:
