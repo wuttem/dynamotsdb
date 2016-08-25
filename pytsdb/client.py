@@ -121,6 +121,9 @@ class TSDB(object):
     def _get_items_between(self, key, ts_min, ts_max):
         return self.storage.query(key, ts_min, ts_max)
 
+    def query(self, key, ts_min, ts_max):
+        return self._query(key, ts_min, ts_max)
+
     def _query(self, key, ts_min, ts_max):
         r = ResultSet(key, self._get_items_between(key, ts_min, ts_max))
         r._trim(ts_min, ts_max)
@@ -143,6 +146,15 @@ class TSDB(object):
         logger.debug("STATS GET HIT: {}".format(key))
         return stats
 
+    def stats(self, key):
+        return self._stats(key)
+
+    def stats_bulk(self, keys):
+        res = []
+        for key in keys:
+            res.append(self._stats(key))
+        return res
+
     def _stats(self, key):
         # Try to get the Stats from Cache
         cached = self._stats_from_cache(key)
@@ -150,13 +162,23 @@ class TSDB(object):
             return cached
         # From DB
         stats = self.storage.stats(key)
-        self.cache.store(key, stats.to_string(), namespace="data_stats")
-        return self.storage.stats(key)
+        if stats is not None:
+            self.cache.store(key, stats.to_string(), namespace="data_stats")
+        return stats
 
     def _data_changed(self, key):
         if not self.settings["ENABLE_CACHING"]:
             return
-        self.cache.expire(key, namespace="data_stats")
+        return self.cache.expire(key, namespace="data_stats")
+
+    def insert_bulk(self, inserts):
+        res = []
+        for i in inserts:
+            res.append(self._insert(i["key"], i["data"]))
+        return res
+
+    def insert(self, key, data):
+        return self._insert(key, data)
 
     def _insert(self, key, data):
         key = key.lower()

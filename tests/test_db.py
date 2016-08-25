@@ -25,6 +25,50 @@ class DatabaseTest(unittest.TestCase):
     def setUpClass(cls):
         logging.basicConfig(level=logging.INFO)
 
+    def test_simple(self):
+        cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
+        cassandra_port = os.getenv('CASSANDRA_PORT', 9042)
+        db = TSDB(STORAGE="cassandra",
+                  CASSANDRA_HOST=cassandra_host,
+                  CASSANDRA_PORT=cassandra_port)
+        db.storage._dropTable()
+        db.storage._createTable()
+
+        d1 = [(i * 600, 6.5) for i in range(500)]
+        d2 = [(i * 600, 25.5) for i in range(500)]
+        d3 = [(i * 600, 10.5) for i in range(500)]
+
+        data = [{"key": "sensor1.ph",
+                 "data": d1},
+                {"key": "sensor1.temp",
+                 "data": d2}]
+        db.insert_bulk(data)
+        db.insert("sensor1.act", d3)
+
+        s = db.stats("sensor1.act")
+        self.assertEqual(s["ts_min"], 0)
+        self.assertEqual(s["ts_max"], 499 * 600)
+        self.assertEqual(s["count"], 500)
+        self.assertEqual(s["key"], "sensor1.act")
+
+        s = db.stats_bulk(["sensor1.ph", "sensor1.temp"])
+        self.assertEqual(len(s), 2)
+        self.assertEqual(s[0]["ts_min"], 0)
+        self.assertEqual(s[0]["ts_max"], 499 * 600)
+        self.assertEqual(s[0]["count"], 500)
+        self.assertEqual(s[0]["key"], "sensor1.ph")
+        self.assertEqual(s[1]["ts_min"], 0)
+        self.assertEqual(s[1]["ts_max"], 499 * 600)
+        self.assertEqual(s[1]["count"], 500)
+        self.assertEqual(s[1]["key"], "sensor1.temp")
+
+        r = db.query("sensor1.act", 0, 500*600)
+        self.assertEqual(len(r), 500)
+        r = db.query("sensor1.ph", 0, 500*600)
+        self.assertEqual(len(r), 500)
+        r = db.query("sensor1.temp", 0, 500*600)
+        self.assertEqual(len(r), 500)
+
     def test_cassandra_rewrite(self):
         cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
         cassandra_port = os.getenv('CASSANDRA_PORT', 9042)

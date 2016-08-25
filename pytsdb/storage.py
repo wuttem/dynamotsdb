@@ -44,8 +44,14 @@ class Storage(object):
         return self._to_item(key, self._left(key, range_key))
 
     def stats(self, key):
-        return Stats(key=key, ts_min=self.ts_min(key), ts_max=self.ts_max(key),
-                     count=self.count(key))
+        try:
+            s = Stats(key=key, ts_min=self.ts_min(key),
+                      ts_max=self.ts_max(key),
+                      count=self.count(key))
+        except NotFoundError:
+            return None
+        else:
+            return s
 
     def ts_min(self, key):
         i = self.first(key)
