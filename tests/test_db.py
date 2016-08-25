@@ -63,11 +63,28 @@ class DatabaseTest(unittest.TestCase):
         self.assertEqual(s[1]["key"], "sensor1.temp")
 
         r = db.query("sensor1.act", 0, 500*600)
-        self.assertEqual(len(r), 500)
+        a = list(r.all())
+        d = list(r.aggregation("daily", "mean"))
+        self.assertEqual(len(a), 500)
+        self.assertEqual(len(d), 4)
+        for ts, v in d:
+            self.assertAlmostEqual(v, 10.5, 4)
+
         r = db.query("sensor1.ph", 0, 500*600)
-        self.assertEqual(len(r), 500)
+        a = list(r.all())
+        d = list(r.aggregation("daily", "mean"))
+        self.assertEqual(len(a), 500)
+        self.assertEqual(len(d), 4)
+        for ts, v in d:
+            self.assertAlmostEqual(v, 6.5, 4)
+        
         r = db.query("sensor1.temp", 0, 500*600)
-        self.assertEqual(len(r), 500)
+        a = list(r.all())
+        d = list(r.aggregation("daily", "mean"))
+        self.assertEqual(len(a), 500)
+        self.assertEqual(len(d), 4)
+        for ts, v in d:
+            self.assertAlmostEqual(v, 25.5, 4)
 
     def test_cassandra_rewrite(self):
         cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
