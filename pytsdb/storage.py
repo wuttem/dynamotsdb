@@ -201,10 +201,12 @@ class CassandraStorage(Storage):
             WHERE key = %s
             """.format(self.table_name)
         from cassandra import InvalidRequest
+        # Fallback to slow count
+        # if cassandra does not support SUM
         try:
             res = self.cassandra.execute(s, (key, ))
         except InvalidRequest:
-            return super(CassandraStorage, self)._query(key)
+            return super(CassandraStorage, self)._count(key)
         return int(res[0][0])
 
 
