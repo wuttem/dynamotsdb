@@ -61,12 +61,15 @@ class Storage(object):
         i = self.last(key)
         return i.ts_max
 
-    def count(self, key):
+    def _count(self, key):
         items = self.query(key, 0, (2**31)-1)
         count = 0
         for i in items:
             count += i.count
         return count
+
+    def count(self, key):
+        return self._count(key)
 
 
 class CassandraStorage(Storage):
@@ -95,6 +98,7 @@ class CassandraStorage(Storage):
             key text,
             range_key int,
             data blob,
+            size int,
             PRIMARY KEY (key, range_key)
             )""".format(self.table_name)
         self.cassandra.execute(s)
@@ -113,15 +117,16 @@ class CassandraStorage(Storage):
     def _from_item(self, item):
         return {"key": item.key,
                 "range_key": item.range_key,
-                "data": item.to_string()}
+                "data": item.to_string(),
+                "size": len(item)}
 
-    def _insert(self, key, range_key, data):
+    def _insert(self, key, range_key, data, size):
         s = """
-            INSERT INTO {} (key, range_key, data)
-            VALUES (%s, %s, %s)
+            INSERT INTO {} (key, range_key, data, size)
+            VALUES (%s, %s, %s, %s)
             """.format(self.table_name)
         data = bytearray(data)
-        self.cassandra.execute(s, (key, range_key, data))
+        self.cassandra.execute(s, (key, range_key, data, size))
 
     def _get(self, key, range_key):
         s = """
@@ -167,8 +172,8 @@ class CassandraStorage(Storage):
             raise NotFoundError
         return res[0].data
 
-    def _update(self, key, range_key, data):
-        self._insert(key, range_key, data)
+    def _update(self, key, range_key, data, size):
+        self._insert(key, range_key, data, size)
 
     def _query(self, key, range_min, range_max):
         s = """
@@ -189,6 +194,14 @@ class CassandraStorage(Storage):
         else:
             items.insert(0, left)
         return items
+
+    def _count(self, key):
+        s = """
+            SELECT SUM(size) FROM {}
+            WHERE key = %s
+            """.format(self.table_name)
+        res = self.cassandra.execute(s, (key, ))
+        return int(res[0][0])
 
 
 class SQLiteStorage(Storage):

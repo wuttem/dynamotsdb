@@ -77,7 +77,7 @@ class DatabaseTest(unittest.TestCase):
         self.assertEqual(len(d), 4)
         for ts, v in d:
             self.assertAlmostEqual(v, 6.5, 4)
-        
+
         r = db.query("sensor1.temp", 0, 500*600)
         a = list(r.all())
         d = list(r.aggregation("daily", "mean"))
@@ -85,6 +85,8 @@ class DatabaseTest(unittest.TestCase):
         self.assertEqual(len(d), 4)
         for ts, v in d:
             self.assertAlmostEqual(v, 25.5, 4)
+
+        # todo bulk query
 
     def test_cassandra_rewrite(self):
         cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
