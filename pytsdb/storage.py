@@ -200,7 +200,11 @@ class CassandraStorage(Storage):
             SELECT SUM(size) FROM {}
             WHERE key = %s
             """.format(self.table_name)
-        res = self.cassandra.execute(s, (key, ))
+        from cassandra import InvalidRequest
+        try:
+            res = self.cassandra.execute(s, (key, ))
+        except InvalidRequest:
+            return super(CassandraStorage, self)._query(key)
         return int(res[0][0])
 
 
