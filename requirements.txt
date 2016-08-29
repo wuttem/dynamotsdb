@@ -5,3 +5,4 @@ pytest>=2.8.5
 coverage>=4.0.3
 python-coveralls>=2.7.0
 redis>=2.10.5
+Flask>=0.11.0
